@@ -8,6 +8,10 @@ export interface Staff {
   role: Role;
   /** Mozos: first day (YYYY-MM-DD) of any 5-work block; the 5-5 cycle is derived from it. */
   cycleAnchor?: string;
+  /** Seniors only: extra shifts they can cover besides P (e.g. ["M", "T"]). */
+  extraShifts?: ShiftCode[];
+  /** Seniors only: max M/T covers per month (defaults to config.maxSeniorMornings). */
+  maxCovers?: number;
 }
 
 export interface ShiftDef {
@@ -50,6 +54,8 @@ export interface GeneratorConfig {
 }
 
 export interface Warning {
+  /** "coverage": a shift is uncovered. "cap": a senior went over their monthly cover limit to avoid a gap. */
+  kind: "coverage" | "cap";
   date: string;
   shift: "M" | "T" | "N";
   message: string;

@@ -1,5 +1,6 @@
 import { monthDates } from "./dates";
-import type { Schedule, ShiftCode, Staff } from "./types";
+import { allowedShifts } from "./rules";
+import type { Schedule, Staff } from "./types";
 
 export interface Coverage {
   M: number;
@@ -19,14 +20,6 @@ export interface Validation {
   coverage: Record<string, Coverage>;
   issues: Issue[];
 }
-
-const ALLOWED: Record<Staff["role"], ShiftCode[]> = {
-  night_auditor: ["N", "D"],
-  director: ["S", "D"],
-  senior: ["P", "M", "D"],
-  receptionist: ["M", "T", "N", "D"],
-  mozo: ["MZ", "D"],
-};
 
 /** Each of M/T/N needs exactly one person per day; extra people are flagged as over-coverage. */
 export function validateSchedule(schedule: Schedule, staff: Staff[], year: number, month: number): Validation {
@@ -52,11 +45,11 @@ export function validateSchedule(schedule: Schedule, staff: Staff[], year: numbe
     dates.forEach((d, i) => {
       const code = schedule[s.id]?.[d];
       if (!code) return;
-      if (!ALLOWED[s.role].includes(code))
+      if (!allowedShifts(s).includes(code))
         issues.push({ kind: "forbidden", date: d, staffId: s.id, message: `${s.name} no puede hacer ${code}` });
-      if (i > 0 && s.role === "receptionist") {
+      if (i > 0 && (s.role === "receptionist" || s.extraShifts)) {
         const prev = schedule[s.id][dates[i - 1]];
-        if ((prev === "T" && code === "M") || (prev === "N" && code !== "D"))
+        if ((prev === "T" && code === "M") || (s.role === "receptionist" && prev === "N" && code !== "D"))
           issues.push({ kind: "rest", date: d, staffId: s.id, message: `${s.name}: descanso insuficiente el ${d}` });
       }
     });

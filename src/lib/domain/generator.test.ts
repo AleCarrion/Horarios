@@ -13,10 +13,10 @@ describe.each([10, 2, 12])("month %i", (month) => {
   const dates = monthDates(2026, month);
   const at = (id: string, d: string) => schedule[id][d];
 
-  it("covers M and T with exactly one receptionist or senior (M) / receptionist (T)", () => {
-    expect(warnings.filter((w) => w.shift !== "N")).toEqual([]);
+  it("covers M and T with exactly one person each (receptionist or covering senior)", () => {
+    expect(warnings.filter((w) => w.kind === "coverage")).toEqual([]);
     for (const d of dates) {
-      const t = recepIds.filter((id) => at(id, d) === "T");
+      const t = Object.keys(schedule).filter((id) => at(id, d) === "T");
       expect(t).toHaveLength(1);
       const m = Object.keys(schedule).filter((id) => at(id, d) === "M");
       expect(m).toHaveLength(1);
@@ -69,8 +69,9 @@ describe.each([10, 2, 12])("month %i", (month) => {
     for (const d of dates) {
       for (const id of ["ana", "julio"]) {
         const s = at(id, d);
-        if (!isWeekend(d)) expect(["P", "M"]).toContain(s);
-        else expect(["P", "M", "D"]).toContain(s);
+        const allowed = id === "julio" ? ["P", "M", "T"] : ["P", "M"];
+        if (!isWeekend(d)) expect(allowed).toContain(s);
+        else expect([...allowed, "D"]).toContain(s);
       }
       if (isWeekend(d)) {
         const both = ["ana", "julio"].filter((id) => at(id, d) === "P");
@@ -87,6 +88,34 @@ describe.each([10, 2, 12])("month %i", (month) => {
         expect(streak).toBeLessThanOrEqual(6);
       }
     }
+  });
+});
+
+describe("seniors as cover", () => {
+  const { schedule, stats } = gen(10);
+  const dates = monthDates(2026, 10);
+
+  it("Julio covers both mornings and afternoons; Ana never covers T", () => {
+    expect(stats.julio.M).toBeGreaterThan(0);
+    expect(stats.julio.T).toBeGreaterThan(0);
+    expect(stats.ana.T).toBe(0);
+  });
+
+  it("nobody who covers works M the day after T", () => {
+    for (const id of ["julio", "ana", ...recepIds])
+      for (let i = 1; i < dates.length; i++)
+        if (schedule[id][dates[i - 1]] === "T") expect(schedule[id][dates[i]]).not.toBe("M");
+  });
+
+  it("receptionists keep a realistic share of rest days (>= 10)", () => {
+    for (const id of recepIds) expect(stats[id].rest).toBeGreaterThanOrEqual(10);
+  });
+
+  it("reports a cap warning instead of leaving a gap when seniors are stretched", () => {
+    const staff = DEFAULT_STAFF.map((x) => (x.role === "senior" ? { ...x, maxCovers: 0 } : x));
+    const r = generateSchedule({ year: 2026, month: 10, staff });
+    expect(r.warnings.filter((w) => w.kind === "coverage")).toEqual([]);
+    expect(r.warnings.some((w) => w.kind === "cap")).toBe(true);
   });
 });
 

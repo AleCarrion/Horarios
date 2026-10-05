@@ -2,17 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { monthDates, weekday, isWeekend } from "@/lib/domain/dates";
+import { allowedShifts } from "@/lib/domain/rules";
 import { SHIFTS, type Schedule, type ShiftCode, type Staff } from "@/lib/domain/types";
 import type { Validation } from "@/lib/domain/validate";
 import { SHIFT_STYLE, WEEKDAYS } from "@/lib/ui";
-
-const OPTIONS: Record<Staff["role"], ShiftCode[]> = {
-  night_auditor: ["N", "D"],
-  director: ["S", "D"],
-  senior: ["P", "M", "D"],
-  receptionist: ["M", "T", "N", "D"],
-  mozo: ["MZ", "D"],
-};
 
 interface Props {
   year: number;
@@ -94,7 +87,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                       onClick={(e) => {
                         const r = e.currentTarget.getBoundingClientRect();
                         opener.current = e.currentTarget;
-                        const h = OPTIONS[s.role].length * 36 + 8;
+                        const h = allowedShifts(s).length * 36 + 8;
                         const y = r.bottom + h > window.innerHeight ? Math.max(4, r.top - h - 4) : r.bottom + 4;
                         setMenu({ staff: s, date: d, x: Math.min(r.left, window.innerWidth - 176), y });
                       }}
@@ -142,7 +135,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
             style={{ left: menu.x, top: menu.y }}
             className="fixed z-30 w-44 rounded-lg border border-slate-300 bg-white p-1 shadow-lg dark:bg-slate-800"
           >
-            {OPTIONS[menu.staff.role].map((c) => (
+            {allowedShifts(menu.staff).map((c) => (
               <button
                 key={c}
                 type="button"

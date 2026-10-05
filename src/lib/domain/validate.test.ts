@@ -22,6 +22,15 @@ describe("validateSchedule", () => {
     expect(v.issues.some((i) => i.kind === "coverage" && i.date === "2026-10-07")).toBe(true);
   });
 
+  it("allows Julio to cover T but not Ana", () => {
+    const { schedule } = base();
+    schedule.julio["2026-10-07"] = "T";
+    schedule.ana["2026-10-08"] = "T";
+    const v = validateSchedule(schedule, DEFAULT_STAFF, 2026, 10);
+    const forbidden = v.issues.filter((i) => i.kind === "forbidden");
+    expect(forbidden.map((i) => i.staffId)).toEqual(["ana"]);
+  });
+
   it("flags forbidden assignments (Marta night, senior night)", () => {
     const { schedule } = base();
     schedule.marta["2026-10-07"] = "N";

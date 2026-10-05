@@ -2,6 +2,8 @@ import { diffDays, isWeekend, monthDates } from "./dates";
 import type { GeneratorConfig, GeneratorResult, Schedule, ShiftCode, Staff, Warning } from "./types";
 
 const MONDAY_ANCHOR = "2026-01-05";
+/** Extra "workload days" a covering senior counts as having, so receptionists are preferred but seniors still share M/T. */
+const SENIOR_PENALTY = 45;
 
 /** Spread `count` rest days in blocks of two, evenly through the month. */
 export function autoJcRestDays(dates: string[], count: number): string[] {
@@ -64,6 +66,18 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
     ]),
   );
   const seniorCovers: Record<string, number> = Object.fromEntries(seniors.map((s) => [s.id, 0]));
+  const seniorLast: Record<string, ShiftCode> = Object.fromEntries(
+    seniors.map((s) => [s.id, (config.prevDay?.[s.id] ?? "D") as ShiftCode]),
+  );
+  const coverCap = (s: Staff) => s.maxCovers ?? maxSeniorMornings;
+  const seniorsFor = (slot: "M" | "T", d: string, ignoreCap = false) =>
+    seniors.filter(
+      (s) =>
+        schedule[s.id][d] === "P" &&
+        s.extraShifts?.includes(slot) &&
+        (ignoreCap || seniorCovers[s.id] < coverCap(s)) &&
+        !(slot === "M" && seniorLast[s.id] === "T"),
+    );
 
   dates.forEach((d, di) => {
     const slots: ("N" | "T" | "M")[] = jcRest.has(d) ? ["N", "M", "T"] : ["M", "T"];
@@ -75,35 +89,43 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
         if (slot === "M" && s.last === "T") return false;
         return true;
       });
-      // Seniors can't cover T, so never let M take the last person able to do it.
+      // M must not take the last receptionist able to do T unless a senior can back T up.
       const canDoT = (r: Staff) => {
         const s = st[r.id];
         return !taken.has(r.id) && s.last !== "N" && s.streak < maxStreak;
       };
+      const tBackup = slot === "M" && seniorsFor("T", d).length > 0;
       const pool =
-        slot === "M" && slots.includes("T") ? eligible.filter((r) => recs.some((o) => o !== r && canDoT(o))) : eligible;
+        slot === "M" && !tBackup ? eligible.filter((r) => recs.some((o) => o !== r && canDoT(o))) : eligible;
       const score = (r: Staff, i: number) => {
         const s = st[r.id];
         return s.worked * 10 + s.streak * 2 + s[slot] * 8 + ((i + seed + di) % recs.length) * 0.1;
       };
-      pool.sort((a, b) => score(a, recs.indexOf(a)) - score(b, recs.indexOf(b)));
-      const pick = pool[0];
+      const candidates: { id: string; score: number; senior: boolean }[] = pool.map((r) => ({
+        id: r.id,
+        score: score(r, recs.indexOf(r)),
+        senior: false,
+      }));
+      if (slot !== "N")
+        for (const s of seniorsFor(slot, d).filter((x) => !taken.has(x.id)))
+          candidates.push({ id: s.id, score: seniorCovers[s.id] * 10 + SENIOR_PENALTY, senior: true });
+      candidates.sort((a, b) => a.score - b.score);
+      let pick = candidates[0];
+      if (!pick && slot !== "N") {
+        // Last resort: a senior over their cap beats an uncovered shift.
+        const over = seniorsFor(slot, d, true).find((x) => !taken.has(x.id));
+        if (over) {
+          pick = { id: over.id, score: 0, senior: true };
+          warnings.push({ kind: "cap", date: d, shift: slot, message: `${over.name} supera su tope de coberturas el ${d}` });
+        }
+      }
       if (pick) {
         taken.add(pick.id);
         set(pick.id, d, slot);
+        if (pick.senior) seniorCovers[pick.id]++;
         continue;
       }
-      if (slot === "M") {
-        const cover = seniors
-          .filter((s) => schedule[s.id][d] === "P" && seniorCovers[s.id] < maxSeniorMornings)
-          .sort((a, b) => seniorCovers[a.id] - seniorCovers[b.id])[0];
-        if (cover) {
-          seniorCovers[cover.id]++;
-          set(cover.id, d, "M");
-          continue;
-        }
-      }
-      warnings.push({ date: d, shift: slot, message: `Sin cobertura de ${slot} el ${d}` });
+      warnings.push({ kind: "coverage", date: d, shift: slot, message: `Sin cobertura de ${slot} el ${d}` });
     }
     for (const r of recs) {
       const s = st[r.id];
@@ -117,6 +139,7 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
       }
       s.last = code;
     }
+    for (const s of seniors) seniorLast[s.id] = schedule[s.id][d];
   });
 
   const stats: GeneratorResult["stats"] = {};
