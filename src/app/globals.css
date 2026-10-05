@@ -29,3 +29,23 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
+
+@page {
+  size: A4 landscape;
+  margin: 8mm;
+}
+
+@media print {
+  html, body {
+    background: #fff !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  main { max-width: none !important; padding: 0 !important; }
+  .overflow-x-auto { overflow: visible !important; border: 0 !important; box-shadow: none !important; }
+  table { font-size: 9px; width: 100%; }
+  th, td { position: static !important; min-width: 0 !important; }
+  td > div { height: 18px !important; width: 100% !important; }
+  select { display: none !important; }
+}

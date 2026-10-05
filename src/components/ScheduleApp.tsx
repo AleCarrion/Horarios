@@ -8,6 +8,8 @@ import type { Schedule } from "@/lib/domain/types";
 import { validateSchedule } from "@/lib/domain/validate";
 import { MONTHS, SHIFT_STYLE } from "@/lib/ui";
 import { SHIFTS } from "@/lib/domain/types";
+import { downloadText } from "@/lib/download";
+import { toCSV, toICS } from "@/lib/export";
 import { ScheduleGrid } from "./ScheduleGrid";
 
 type Action =
@@ -38,6 +40,7 @@ function load(y: number, m: number): Schedule {
 export function ScheduleApp() {
   const now = new Date();
   const [ym, setYm] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
+  const [icsPerson, setIcsPerson] = useState(DEFAULT_STAFF[0].id);
   const [h, dispatch] = useReducer(reducer, undefined, () =>
     createHistory(generateSchedule({ year: ym.year, month: ym.month, staff: DEFAULT_STAFF }).schedule),
   );
@@ -70,12 +73,20 @@ export function ScheduleApp() {
     });
   };
 
+  const fileBase = `horario-${ym.year}-${String(ym.month).padStart(2, "0")}`;
+  const exportCSV = () =>
+    downloadText(`${fileBase}.csv`, toCSV(h.present, DEFAULT_STAFF, ym.year, ym.month), "text/csv");
+  const exportICS = () => {
+    const person = DEFAULT_STAFF.find((p) => p.id === icsPerson)!;
+    downloadText(`${fileBase}-${person.id}.ics`, toICS(h.present, person, ym.year, ym.month), "text/calendar");
+  };
+
   const btn =
     "rounded-lg border border-brand/30 px-3 py-2 text-sm font-medium hover:bg-brand/10 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-brand";
 
   return (
     <main className="mx-auto w-full min-w-0 max-w-[1500px] space-y-4 p-4">
-      <header className="flex flex-wrap items-center gap-3">
+      <header className="flex flex-wrap items-center gap-3 print:hidden">
         <h1 className="text-xl font-bold text-brand">Horarios · Casa 1800</h1>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <button className={btn} onClick={() => shiftMonth(-1)} aria-label="Mes anterior">‹</button>
@@ -94,6 +105,26 @@ export function ScheduleApp() {
         </div>
       </header>
 
+      <h2 className="hidden text-lg font-bold print:block">
+        Horario {MONTHS[ym.month - 1]} {ym.year} · Hotel Casa 1800
+      </h2>
+
+      <div className="flex flex-wrap items-center gap-2 print:hidden" role="group" aria-label="Exportar">
+        <span className="text-sm font-medium">Exportar:</span>
+        <button className={btn} onClick={() => window.print()}>PDF / Imprimir</button>
+        <button className={btn} onClick={exportCSV}>CSV (Excel)</button>
+        <label className="sr-only" htmlFor="ics-person">Persona para iCal</label>
+        <select
+          id="ics-person"
+          value={icsPerson}
+          onChange={(e) => setIcsPerson(e.target.value)}
+          className="rounded-lg border border-brand/30 bg-transparent px-2 py-2 text-sm"
+        >
+          {DEFAULT_STAFF.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        <button className={btn} onClick={exportICS}>iCal (.ics)</button>
+      </div>
+
       <ul className="flex flex-wrap gap-2 text-xs" aria-label="Leyenda">
         {(["M", "T", "N", "S", "P", "MZ", "D"] as const).map((c) => (
           <li key={c} className={`rounded px-2 py-1 font-semibold ${SHIFT_STYLE[c]}`}>
@@ -111,7 +142,7 @@ export function ScheduleApp() {
         onEdit={(staffId, date, code) => dispatch({ type: "edit", staffId, date, code })}
       />
 
-      <section aria-live="polite" className="rounded-xl border border-slate-300/60 bg-white p-3 text-sm dark:bg-slate-900">
+      <section aria-live="polite" className="print:hidden rounded-xl border border-slate-300/60 bg-white p-3 text-sm dark:bg-slate-900">
         {validation.issues.length === 0 ? (
           <p className="font-medium text-emerald-700">✓ Todas las reglas y coberturas se cumplen.</p>
         ) : (
