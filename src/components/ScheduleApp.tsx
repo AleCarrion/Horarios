@@ -150,7 +150,7 @@ export function ScheduleApp() {
       <ul className="flex flex-wrap gap-2 text-xs" aria-label="Leyenda">
         {(["M", "T", "N", "S", "P", "MZ", "D"] as const).map((c) => (
           <li key={c} className={`rounded px-2 py-1 font-semibold ${SHIFT_STYLE[c]}`}>
-            {c === "D" ? "–" : c} {SHIFTS[c].label} {SHIFTS[c].start && `${SHIFTS[c].start}-${SHIFTS[c].end}`}
+            {c} {SHIFTS[c].label} {SHIFTS[c].start && `${SHIFTS[c].start}-${SHIFTS[c].end}`}
           </li>
         ))}
       </ul>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { monthDates, weekday, isWeekend } from "@/lib/domain/dates";
 import { SHIFTS, type Schedule, type ShiftCode, type Staff } from "@/lib/domain/types";
 import type { Validation } from "@/lib/domain/validate";
@@ -25,6 +26,32 @@ interface Props {
 
 export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, readOnly }: Props) {
   const dates = monthDates(year, month);
+  const [menu, setMenu] = useState<{ staff: Staff; date: string; x: number; y: number } | null>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const closeMenu = () => {
+    setMenu(null);
+    opener.current?.focus();
+  };
+
+  useEffect(() => {
+    if (!menu) return;
+    const current = menuRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    (current ?? menuRef.current?.querySelector<HTMLElement>("button"))?.focus();
+  }, [menu]);
+
+  const onMenuKey = (e: React.KeyboardEvent) => {
+    const items = [...(menuRef.current?.querySelectorAll<HTMLElement>("button") ?? [])];
+    const i = items.indexOf(document.activeElement as HTMLElement);
+    if (e.key === "Escape") closeMenu();
+    else if (e.key === "ArrowDown") items[(i + 1) % items.length]?.focus();
+    else if (e.key === "ArrowUp") items[(i - 1 + items.length) % items.length]?.focus();
+    else if (e.key === "Tab") closeMenu();
+    else return;
+    e.preventDefault();
+  };
+
   const bad = new Set(validation.issues.filter((i) => i.staffId).map((i) => `${i.staffId}|${i.date}`));
 
   return (
@@ -59,26 +86,24 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                 const invalid = bad.has(`${s.id}|${d}`);
                 return (
                   <td key={d} className="p-0.5">
-                    <div
-                      className={`relative flex h-9 w-10 items-center justify-center rounded text-xs font-semibold ${SHIFT_STYLE[code]} ${
+                    <button
+                      type="button"
+                      disabled={readOnly}
+                      aria-haspopup="listbox"
+                      aria-label={`${s.name}, ${d}, ${SHIFTS[code].label} ${code}`}
+                      onClick={(e) => {
+                        const r = e.currentTarget.getBoundingClientRect();
+                        opener.current = e.currentTarget;
+                        const h = OPTIONS[s.role].length * 36 + 8;
+                        const y = r.bottom + h > window.innerHeight ? Math.max(4, r.top - h - 4) : r.bottom + 4;
+                        setMenu({ staff: s, date: d, x: Math.min(r.left, window.innerWidth - 176), y });
+                      }}
+                      className={`flex h-9 w-10 items-center justify-center rounded text-xs font-semibold ${SHIFT_STYLE[code]} ${
                         invalid ? "ring-2 ring-red-600" : ""
-                      } focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-brand`}
+                      } enabled:cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand`}
                     >
-                      <span aria-hidden="true">{code === "D" ? "–" : code}</span>
-                      <select
-                        aria-label={`${s.name}, ${d}`}
-                        value={code}
-                        disabled={readOnly}
-                        onChange={(e) => onEdit(s.id, d, e.target.value as ShiftCode)}
-                        className="absolute inset-0 cursor-pointer opacity-0"
-                      >
-                        {OPTIONS[s.role].map((c) => (
-                          <option key={c} value={c}>
-                            {c === "D" ? "–" : c} · {SHIFTS[c].label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                      {code}
+                    </button>
                   </td>
                 );
               })}
@@ -106,6 +131,38 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
           ))}
         </tfoot>
       </table>
+      {menu && (
+        <>
+          <div className="fixed inset-0 z-20" onClick={closeMenu} aria-hidden="true" />
+          <div
+            ref={menuRef}
+            role="listbox"
+            aria-label={`Turno de ${menu.staff.name}, ${menu.date}`}
+            onKeyDown={onMenuKey}
+            style={{ left: menu.x, top: menu.y }}
+            className="fixed z-30 w-44 rounded-lg border border-slate-300 bg-white p-1 shadow-lg dark:bg-slate-800"
+          >
+            {OPTIONS[menu.staff.role].map((c) => (
+              <button
+                key={c}
+                type="button"
+                role="option"
+                aria-selected={(schedule[menu.staff.id]?.[menu.date] ?? "D") === c}
+                onClick={() => {
+                  onEdit(menu.staff.id, menu.date, c);
+                  closeMenu();
+                }}
+                className="flex h-9 w-full items-center gap-2 rounded px-2 text-left text-sm hover:bg-brand/10 focus-visible:bg-brand/15 focus-visible:outline-2 focus-visible:outline-brand aria-selected:font-bold"
+              >
+                <span className={`flex h-6 w-8 items-center justify-center rounded text-xs font-semibold ${SHIFT_STYLE[c]}`}>
+                  {c}
+                </span>
+                {SHIFTS[c].label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
