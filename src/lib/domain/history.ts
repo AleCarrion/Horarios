@@ -58,3 +58,9 @@ export function redo(h: History): History {
     undone: h.undone.slice(1),
   };
 }
+
+/** Apply a change that came from another session: no undo entry, and it survives undo/redo. */
+export function applyRemote(h: History, staffId: string, date: string, to: ShiftCode): History {
+  const patch = (s: Schedule): Schedule => ({ ...s, [staffId]: { ...s[staffId], [date]: to } });
+  return { ...h, past: h.past.map(patch), present: patch(h.present), future: h.future.map(patch) };
+}

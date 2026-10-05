@@ -20,9 +20,10 @@ interface Props {
   schedule: Schedule;
   validation: Validation;
   onEdit: (staffId: string, date: string, code: ShiftCode) => void;
+  readOnly?: boolean;
 }
 
-export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit }: Props) {
+export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, readOnly }: Props) {
   const dates = monthDates(year, month);
   const bad = new Set(validation.issues.filter((i) => i.staffId).map((i) => `${i.staffId}|${i.date}`));
 
@@ -67,6 +68,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit 
                       <select
                         aria-label={`${s.name}, ${d}`}
                         value={code}
+                        disabled={readOnly}
                         onChange={(e) => onEdit(s.id, d, e.target.value as ShiftCode)}
                         className="absolute inset-0 cursor-pointer opacity-0"
                       >

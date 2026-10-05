@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useReducer, useState } from "react";
 import { generateSchedule } from "@/lib/domain/generator";
-import { applyEdit, createHistory, redo, undo } from "@/lib/domain/history";
+import { applyEdit, applyRemote, createHistory, redo, undo } from "@/lib/domain/history";
 import { DEFAULT_STAFF } from "@/lib/domain/roster";
 import type { Schedule } from "@/lib/domain/types";
 import { validateSchedule } from "@/lib/domain/validate";
@@ -10,11 +10,16 @@ import { MONTHS, SHIFT_STYLE } from "@/lib/ui";
 import { SHIFTS } from "@/lib/domain/types";
 import { downloadText } from "@/lib/download";
 import { toCSV, toICS } from "@/lib/export";
+import { remoteConfigured } from "@/lib/supabase";
+import { useAuth } from "@/lib/useAuth";
+import { useRemoteSchedule } from "@/lib/useRemoteSchedule";
+import { AuthBar } from "./AuthBar";
 import { ScheduleGrid } from "./ScheduleGrid";
 
 type Action =
   | { type: "reset"; schedule: Schedule }
   | { type: "edit"; staffId: string; date: string; code: Parameters<typeof applyEdit>[3] }
+  | { type: "remote"; staffId: string; date: string; code: Parameters<typeof applyEdit>[3] }
   | { type: "undo" }
   | { type: "redo" };
 
@@ -22,6 +27,7 @@ function reducer(h: ReturnType<typeof createHistory>, a: Action) {
   switch (a.type) {
     case "reset": return createHistory(a.schedule);
     case "edit": return applyEdit(h, a.staffId, a.date, a.code);
+    case "remote": return applyRemote(h, a.staffId, a.date, a.code);
     case "undo": return undo(h);
     case "redo": return redo(h);
   }
@@ -44,6 +50,17 @@ export function ScheduleApp() {
   const [h, dispatch] = useReducer(reducer, undefined, () =>
     createHistory(generateSchedule({ year: ym.year, month: ym.month, staff: DEFAULT_STAFF }).schedule),
   );
+
+  const auth = useAuth();
+  const remote = useRemoteSchedule({
+    year: ym.year,
+    month: ym.month,
+    present: h.present,
+    auth,
+    onLoaded: (s) => dispatch({ type: "reset", schedule: s ?? load(ym.year, ym.month) }),
+    onRemoteCell: (r) => dispatch({ type: "remote", staffId: r.staff_id, date: r.day, code: r.shift_code }),
+  });
+  const readOnly = remoteConfigured && !remote.canEdit;
 
   useEffect(() => {
     dispatch({ type: "reset", schedule: load(ym.year, ym.month) });
@@ -86,6 +103,7 @@ export function ScheduleApp() {
 
   return (
     <main className="mx-auto w-full min-w-0 max-w-[1500px] space-y-4 p-4">
+      {remoteConfigured && <AuthBar auth={auth} status={remote.status} />}
       <header className="flex flex-wrap items-center gap-3 print:hidden">
         <h1 className="text-xl font-bold text-brand">Horarios · Casa 1800</h1>
         <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -94,10 +112,14 @@ export function ScheduleApp() {
             {MONTHS[ym.month - 1]} {ym.year}
           </span>
           <button className={btn} onClick={() => shiftMonth(1)} aria-label="Mes siguiente">›</button>
-          <button className={btn} onClick={() => dispatch({ type: "undo" })} disabled={!h.past.length}>Deshacer</button>
-          <button className={btn} onClick={() => dispatch({ type: "redo" })} disabled={!h.future.length}>Rehacer</button>
+          <button className={btn} onClick={() => dispatch({ type: "undo" })} disabled={readOnly || !h.past.length}>Deshacer</button>
+          <button className={btn} onClick={() => dispatch({ type: "redo" })} disabled={readOnly || !h.future.length}>Rehacer</button>
+          {remote.draft && (
+            <button className={btn} onClick={() => void remote.publish()}>Publicar mes</button>
+          )}
           <button
-            className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-brand"
+            disabled={readOnly}
+            className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-brand"
             onClick={regenerate}
           >
             Generar automático
@@ -133,7 +155,13 @@ export function ScheduleApp() {
         ))}
       </ul>
 
+      {remote.unpublished ? (
+        <p className="rounded-xl border border-slate-300/60 bg-white p-4 dark:bg-slate-900">
+          Este mes todavía no está publicado.
+        </p>
+      ) : (
       <ScheduleGrid
+        readOnly={readOnly}
         year={ym.year}
         month={ym.month}
         staff={DEFAULT_STAFF}
@@ -141,6 +169,7 @@ export function ScheduleApp() {
         validation={validation}
         onEdit={(staffId, date, code) => dispatch({ type: "edit", staffId, date, code })}
       />
+      )}
 
       <section aria-live="polite" className="print:hidden rounded-xl border border-slate-300/60 bg-white p-3 text-sm dark:bg-slate-900">
         {validation.issues.length === 0 ? (
