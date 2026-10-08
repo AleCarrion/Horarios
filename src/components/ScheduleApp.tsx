@@ -21,6 +21,7 @@ import { planDayOff, planFix, planShiftPref, planShiftSwap, type Plan, type Repa
 import { decide, KIND_LABEL, planForRequest, requestMonth, type ShiftRequest } from "@/lib/domain/requests";
 import { readRequests, writeRequests } from "@/lib/requestsStore";
 import { downloadText } from "@/lib/download";
+import { backupName, createBackup, describeBackup, parseBackup, restoreBackup, type Backup } from "@/lib/backup";
 import { toCSV, toICS } from "@/lib/export";
 import { remoteConfigured } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
@@ -354,6 +355,20 @@ export function ScheduleApp() {
   };
 
   const fileBase = `horario-${ym.year}-${String(ym.month).padStart(2, "0")}`;
+  // --- backup of everything on this device
+  const restoreInput = useRef<HTMLInputElement>(null);
+  const [restoring, setRestoring] = useState<{ backup: Backup } | null>(null);
+  const [backupError, setBackupError] = useState<string | null>(null);
+  const saveBackup = () => {
+    const b = createBackup(localStorage);
+    downloadText(backupName(b), JSON.stringify(b), "application/json");
+  };
+  const readBackupFile = async (file: File | undefined) => {
+    if (!file) return;
+    const parsed = parseBackup(await file.text());
+    if (parsed.ok) setRestoring({ backup: parsed.backup });
+    else setBackupError(parsed.error);
+  };
   const exportCSV = () =>
     downloadText(`${fileBase}.csv`, toCSV(h.present, visible, ym.year, ym.month), "text/csv");
   const exportICS = (person: Staff) =>
@@ -364,6 +379,8 @@ export function ScheduleApp() {
     { label: "Rehacer", icon: <RedoIcon />, onClick: () => dispatch({ type: "redo" }), disabled: readOnly || !h.future.length },
     { label: "Exportar PDF / imprimir", hint: "Una página A4 apaisada con todo el mes", icon: <PrinterIcon />, onClick: printMonth },
     { label: "Exportar CSV (Excel)", icon: <TableIcon />, onClick: exportCSV },
+    { label: "Guardar copia de seguridad", hint: "Descarga todo: equipo, meses, solicitudes y bloqueos", icon: <DownloadIcon />, onClick: saveBackup },
+    ...(readOnly ? [] : [{ label: "Restaurar copia de seguridad", icon: <DownloadIcon />, onClick: () => restoreInput.current?.click() }]),
     ...(remote.draft ? [{ label: "Publicar mes", icon: <DownloadIcon />, onClick: () => void remote.publish() }] : []),
     { label: "Generar automático", hint: "Rehace el calendario del mes", icon: <SparklesIcon />, onClick: () => setConfirmRegenerate(true), disabled: readOnly, tone: "accent" as const },
   ];
@@ -439,7 +456,7 @@ export function ScheduleApp() {
                 </span>
               )}
             </button>
-            <ExportMenu onPdf={printMonth} onCsv={exportCSV} />
+            <ExportMenu onPdf={printMonth} onCsv={exportCSV} onBackup={saveBackup} onRestore={readOnly ? undefined : () => restoreInput.current?.click()} />
             {remote.draft && (
               <button
                 className="rounded-xl border border-brand/40 bg-brand/10 px-3.5 py-2 text-sm font-semibold text-brand transition hover:-translate-y-0.5 hover:bg-brand/20"
@@ -605,6 +622,44 @@ export function ScheduleApp() {
         version={requestsVersion}
         disabled={readOnly}
       />
+      <input
+        ref={restoreInput}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        aria-label="Archivo de copia de seguridad"
+        onChange={(e) => {
+          void readBackupFile(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+      {restoring && (
+        <ConfirmDialog
+          title="¿Restaurar esta copia?"
+          confirmLabel="Sí, restaurar"
+          onCancel={() => setRestoring(null)}
+          onConfirm={() => {
+            restoreBackup(localStorage, restoring.backup);
+            clearScheduleCache();
+            window.location.reload();
+          }}
+        >
+          {(() => {
+            const d = describeBackup(restoring.backup);
+            return (
+              <>
+                <p>Copia del {restoring.backup.createdAt.slice(0, 10)}: {d.people} personas, {d.months} meses guardados y {d.requests} solicitudes.</p>
+                <p className="mt-2 font-semibold">Todo lo que hay ahora en este dispositivo se sustituye por esta copia. Antes te recomiendo guardar una copia de lo actual.</p>
+              </>
+            );
+          })()}
+        </ConfirmDialog>
+      )}
+      {backupError && (
+        <ConfirmDialog title="No se puede restaurar" confirmLabel="Entendido" cancelLabel="Cerrar" onCancel={() => setBackupError(null)} onConfirm={() => setBackupError(null)}>
+          <p>{backupError}</p>
+        </ConfirmDialog>
+      )}
       {confirmRegenerate && (
         <ConfirmDialog
           title="¿Seguro que quieres continuar?"

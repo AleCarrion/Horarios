@@ -44,6 +44,35 @@ test("pedir un libre con reajuste enseña una vista previa antes de cambiar nada
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
+test("copia de seguridad: guardar, perder los datos y restaurar deja todo igual", async ({ page, viewport }) => {
+  test.skip((viewport?.width ?? 1280) < 640, "el menú Exportar es de escritorio");
+  await open(page);
+  const day = await lateDay(page);
+  await page.locator(`[data-row][data-col="${day}"]`).nth(3).click();
+  await page.getByRole("checkbox").uncheck();
+  await page.getByRole("option", { name: /Libre/ }).click(); // saved on this device
+  await page.waitForTimeout(500);
+  const before = await page.evaluate(() => JSON.stringify(Object.fromEntries(Object.entries(localStorage).filter(([k]) => k.startsWith("horarios:") && k !== "horarios:queue"))));
+  await page.getByRole("button", { name: /Exportar/ }).click();
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("menuitem", { name: /Guardar copia/ }).click()]);
+  const file = await download.path();
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.waitForSelector(".schedule-table");
+  await page.getByLabel("Archivo de copia de seguridad").setInputFiles(file);
+  await page.getByRole("button", { name: "Sí, restaurar" }).click();
+  await page.waitForSelector(".schedule-table");
+  const after = await page.evaluate(() => JSON.stringify(Object.fromEntries(Object.entries(localStorage).filter(([k]) => k.startsWith("horarios:") && k !== "horarios:queue"))));
+  expect(after).toBe(before);
+});
+
+test("un archivo que no es una copia se rechaza con un mensaje claro", async ({ page, viewport }) => {
+  test.skip((viewport?.width ?? 1280) < 640, "el menú Exportar es de escritorio");
+  await open(page);
+  await page.getByLabel("Archivo de copia de seguridad").setInputFiles({ name: "x.json", mimeType: "application/json", buffer: Buffer.from("{\"hola\":1}") });
+  await expect(page.getByRole("alertdialog")).toContainText("no es una copia de seguridad");
+});
+
 test("la página de equipo lista la plantilla", async ({ page }) => {
   await page.goto("/equipo");
   await expect(page.getByRole("heading", { name: "Equipo" })).toBeVisible();

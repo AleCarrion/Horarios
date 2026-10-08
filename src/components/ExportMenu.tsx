@@ -6,9 +6,11 @@ import { ChevronDown, DownloadIcon, PrinterIcon, TableIcon } from "./icons";
 interface Props {
   onPdf: () => void;
   onCsv: () => void;
+  onBackup: () => void;
+  onRestore?: () => void;
 }
 
-export function ExportMenu({ onPdf, onCsv }: Props) {
+export function ExportMenu({ onPdf, onCsv, onBackup, onRestore }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -64,6 +66,17 @@ export function ExportMenu({ onPdf, onCsv }: Props) {
             <TableIcon width={16} height={16} className="text-emerald-600" />
             <span>CSV (Excel)<span className="block text-[11px] font-normal text-muted">Con las mismas letras que vuestra hoja</span></span>
           </button>
+          <div className="my-1 border-t border-line" />
+          <button role="menuitem" className={item} onClick={() => { setOpen(false); onBackup(); }}>
+            <DownloadIcon width={16} height={16} className="text-brand" />
+            <span>Guardar copia de seguridad<span className="block text-[11px] font-normal text-muted">Todo el equipo, meses y solicitudes</span></span>
+          </button>
+          {onRestore && (
+            <button role="menuitem" className={item} onClick={() => { setOpen(false); onRestore(); }}>
+              <DownloadIcon width={16} height={16} className="rotate-180 text-brand" />
+              <span>Restaurar copia…<span className="block text-[11px] font-normal text-muted">Sustituye lo de este dispositivo</span></span>
+            </button>
+          )}
           <p className="px-3 pb-1 pt-2 text-[11px] text-muted">Calendario .ics: pulsa el icono junto al nombre de cada persona.</p>
         </div>
       )}
