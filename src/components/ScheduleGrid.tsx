@@ -44,14 +44,19 @@ interface Props {
   onCalendar?: (staff: Staff) => void;
   /** Drag a person to reorder them or drop them in another section (changes their puesto). */
   onMove?: (id: string, role: Role, beforeId: string | null) => void;
+  /** Ask for a day off / holidays and re-plan the rest of the month around it (the app shows a preview first). */
+  onPlan?: (staffId: string, date: string, kind: "D" | "V", days: number) => void;
+  /** Cells a pending plan would change ("staffId|date"), outlined in the grid. */
+  preview?: Set<string>;
   readOnly?: boolean;
   today?: string | null;
 }
 
-export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, onCalendar, onMove, readOnly, today }: Props) {
+export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, onCalendar, onMove, onPlan, preview, readOnly, today }: Props) {
   const dates = monthDates(year, month);
   const [menu, setMenu] = useState<{ staff: Staff; date: string; x: number; y: number } | null>(null);
   const [days, setDays] = useState(1);
+  const [rebalance, setRebalance] = useState(true);
   const opener = useRef<HTMLElement | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLTableElement>(null);
@@ -299,7 +304,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                         onClick={(e) => openMenu(e, s.id, d)}
                         className={`relative flex h-9 w-9 items-center justify-center rounded-lg text-[13px] font-bold tracking-tight shadow-[inset_0_-2px_0_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.35)] transition-[transform,box-shadow] duration-150 enabled:cursor-pointer enabled:hover:z-10 enabled:hover:-translate-y-0.5 enabled:hover:scale-110 enabled:hover:shadow-lg enabled:active:scale-95 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
                           code === "B" ? "bg-[repeating-linear-gradient(135deg,#0b0b0b_0_5px,#1f1f1f_5px_10px)]" : SHIFT_STYLE[code]
-                        } ${bad.has(`${s.id}|${d}`) ? "anim-alert ring-2 ring-red-600" : ""}`}
+                        } ${bad.has(`${s.id}|${d}`) ? "anim-alert ring-2 ring-red-600" : ""} ${preview?.has(`${s.id}|${d}`) ? "ring-[3px] ring-accent ring-offset-1 ring-offset-card-solid" : ""}`}
                       >
                         {displayCode(code)}
                       </button>
@@ -370,7 +375,9 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                   onClick={() => {
                     // Apply to `days` consecutive days from the clicked one (e.g. 14 days of vacation).
                     const start = dates.indexOf(menu.date);
-                    onEdit(dates.slice(start, start + days).map((date) => ({ staffId: menu.staff.id, date, to: c })));
+                    const range = dates.slice(start, start + days);
+                    if (rebalance && onPlan && (c === "D" || c === "V")) onPlan(menu.staff.id, range[0], c, range.length);
+                    else onEdit(range.map((date) => ({ staffId: menu.staff.id, date, to: c })));
                     closeMenu();
                   }}
                   className="flex h-10 w-full items-center gap-2.5 rounded-xl px-2 text-left text-sm transition hover:bg-brand/10 focus-visible:bg-brand/15 focus-visible:outline-2 focus-visible:outline-brand aria-selected:bg-brand/10 aria-selected:font-bold"
@@ -403,6 +410,14 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
               />
               días
             </label>
+            {onPlan && (
+              <label className="mt-1.5 flex cursor-pointer items-start gap-2 px-2 text-xs text-muted">
+                <input type="checkbox" checked={rebalance} onChange={(e) => setRebalance(e.target.checked)} className="mt-0.5 h-3.5 w-3.5" />
+                <span>
+                  Al elegir <b>Libre</b> o <b>Vacaciones</b>, reajustar el resto del horario (mueve su descanso)
+                </span>
+              </label>
+            )}
           </div>
         </>
       )}

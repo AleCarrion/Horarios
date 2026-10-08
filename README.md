@@ -34,3 +34,12 @@ cambiar el orden, soltarlas en otra sección para cambiar de puesto, renombrarla
 ponerles fecha de alta y baja. Sin Supabase se guarda en el dispositivo; con Supabase se guarda en la tabla
 `staff` (`sort_order`, `role`, fechas…) y se comparte en tiempo real. La primera editora que entra publica el
 equipo que tenga en local si la tabla está vacía.
+
+## Reajustes con mínimo cambio
+
+Al pedir **Libre** o **Vacaciones** para alguien (menú de la casilla, con "reajustar el resto del horario"),
+o al cambiar el equipo (puesto, alta, baja, añadir), la app planifica el mes alrededor del cambio y enseña
+una vista previa antes de aplicarlo. Un libre solicitado es, siempre que se puede, un *intercambio*: la
+persona libra el día pedido y trabaja uno de sus descansos (4 casillas, mismo total de descansos). Si no basta,
+se recalcula una ventana creciente alrededor del día. Los días pasados y los próximos 2 días no se tocan solos.
+Lógica en `src/lib/domain/repair.ts` (con tests).

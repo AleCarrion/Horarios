@@ -4,14 +4,15 @@ import { useEffect, useMemo, useReducer, useState } from "react";
 import { generateSchedule } from "@/lib/domain/generator";
 import { applyEdits, applyRemote, createHistory, redo, undo, type Edit } from "@/lib/domain/history";
 import { DEFAULT_STAFF } from "@/lib/domain/roster";
-import { addStaff, changeRole, moveStaff, removeStaff, updateStaff } from "@/lib/domain/team";
+import { addStaff, changeRole, moveStaff, updateStaff } from "@/lib/domain/team";
 import { readRoster, writeRoster } from "@/lib/staffStore";
 import { useRemoteStaff } from "@/lib/useRemoteStaff";
 import { diffSchedules } from "@/lib/sync";
-import { isActive, type Role, type Schedule, type ShiftCode, type Staff } from "@/lib/domain/types";
+import { activeInMonth, isActive, type Role, type Schedule, type ShiftCode, type Staff } from "@/lib/domain/types";
 import { validateSchedule } from "@/lib/domain/validate";
 import { MONTHS, SHIFT_STYLE } from "@/lib/ui";
 import { SHIFTS, displayCode } from "@/lib/domain/types";
+import { firstEditable, planDayOff, planRestructure, type Plan } from "@/lib/domain/repair";
 import { downloadText } from "@/lib/download";
 import { toCSV, toICS } from "@/lib/export";
 import { remoteConfigured } from "@/lib/supabase";
@@ -21,6 +22,7 @@ import { AuthBar } from "./AuthBar";
 import { ExportMenu } from "./ExportMenu";
 import { ChevronLeft, ChevronRight, CheckIcon, LogoMark, RedoIcon, SparklesIcon, UndoIcon } from "./icons";
 import { TeamPanel } from "./TeamPanel";
+import { PlanDialog } from "./PlanDialog";
 import { ScheduleGrid } from "./ScheduleGrid";
 import { StatCards } from "./StatCards";
 
@@ -67,12 +69,16 @@ export function ScheduleApp() {
 
   const [staff, setStaff] = useState<Staff[]>(DEFAULT_STAFF);
   const [today, setToday] = useState<string | null>(null);
+  const [plan, setPlan] = useState<{ plan: Plan; title: string; team?: Staff[] } | null>(null);
   useEffect(() => {
     // localStorage / the clock are only safe to read after mount
     setStaff(readRoster()); // eslint-disable-line react-hooks/set-state-in-effect
     const t = new Date();
     setToday(`${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`);
   }, []);
+
+  // People who are not on the roster at all this month (baja before it starts) are hidden from the grid.
+  const visible = useMemo(() => staff.filter((p) => activeInMonth(p, ym.year, ym.month)), [staff, ym]);
 
   const auth = useAuth();
   const remote = useRemoteSchedule({
@@ -94,9 +100,10 @@ export function ScheduleApp() {
     try { localStorage.setItem(storageKey(ym.year, ym.month), JSON.stringify(h.present)); } catch {}
   }, [h.present, h.changes.length, ym]);
 
+  const shown = plan?.plan.schedule ?? h.present; // while a request is previewed the grid shows it
   const validation = useMemo(
-    () => validateSchedule(h.present, staff, ym.year, ym.month),
-    [h.present, ym, staff],
+    () => validateSchedule(shown, visible, ym.year, ym.month),
+    [shown, ym, visible],
   );
 
   const stats = useMemo(() => {
@@ -105,9 +112,9 @@ export function ScheduleApp() {
     const covered = days.reduce((n, c) => n + Math.min(c.M, 1) + Math.min(c.T, 1) + Math.min(c.N, 1), 0);
     const first = `${ym.year}-${String(ym.month).padStart(2, "0")}-01`;
     const last = `${ym.year}-${String(ym.month).padStart(2, "0")}-${String(days.length).padStart(2, "0")}`;
-    const people = staff.filter((p) => isActive(p, first) || isActive(p, last)).length;
+    const people = visible.filter((p) => isActive(p, first) || isActive(p, last)).length;
     return { total, covered, pct: total ? Math.round((covered / total) * 100) : 100, people };
-  }, [validation, staff, ym]);
+  }, [validation, visible, ym]);
 
   const shiftMonth = (delta: number) =>
     setYm(({ year, month }) => {
@@ -142,16 +149,39 @@ export function ScheduleApp() {
     });
   };
 
-  // --- team: reorder / change puesto / rename / add / remove. Order-only changes keep the month untouched.
-  const saveTeam = (next: Staff[], recalc: boolean) => {
+  // --- team: reorder / change puesto / rename / add / remove.
+  // Order and names apply at once; anything that changes who works (puesto, dates, add, remove) is planned
+  // around the rest of the month and shown as a preview first.
+  const day = (iso: string, n: number) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    const t = new Date(Date.UTC(y, m - 1, d + n));
+    return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`;
+  };
+  const monthStart = `${ym.year}-${String(ym.month).padStart(2, "0")}-01`;
+  /** First day that automatic changes may touch (today + protected days), or the 1st of the month. */
+  const editableStart = () => {
+    const f = firstEditable({ today: today ?? undefined });
+    return f && f > monthStart ? f : monthStart;
+  };
+  const saveTeam = (next: Staff[]) => {
     setStaff(next);
     writeRoster(next);
-    if (recalc) regenerate(next);
+  };
+  const proposeTeam = (next: Staff[], title: string) => {
+    if (next === staff) return;
+    const result = planRestructure(
+      { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined },
+      next,
+      monthStart,
+    );
+    setPlan({ plan: result, title, team: next });
   };
   const onMovePerson = (id: string, role: Role, beforeId: string | null) => {
     const next = moveStaff(staff, id, role, beforeId);
     if (next === staff) return;
-    saveTeam(next, staff.find((x) => x.id === id)?.role !== role);
+    const person = staff.find((x) => x.id === id);
+    if (person?.role === role) saveTeam(next);
+    else proposeTeam(next, `${person?.name}: nuevo puesto`);
   };
   const nudge = (id: string, dir: -1 | 1) => {
     const me = staff.find((x) => x.id === id);
@@ -160,12 +190,22 @@ export function ScheduleApp() {
     const i = peers.findIndex((x) => x.id === id);
     const j = i + dir;
     if (j < 0 || j >= peers.length) return;
-    // moving down = before the person two places ahead; moving up = before the previous one
     const before = dir === -1 ? peers[j].id : (peers[j + 1]?.id ?? null);
-    saveTeam(moveStaff(staff, id, me.role, before), false);
+    saveTeam(moveStaff(staff, id, me.role, before));
   };
   const changeDates = (id: string, field: "activeFrom" | "activeTo", value: string) =>
-    saveTeam(updateStaff(staff, id, { [field]: value || undefined }), true);
+    proposeTeam(updateStaff(staff, id, { [field]: value || undefined }), `${staff.find((x) => x.id === id)?.name}: ${field === "activeFrom" ? "alta" : "baja"}`);
+  const addPerson = (name: string, role: Role) => {
+    const next = addStaff(staff, { name, role });
+    const added = next.find((x) => !staff.some((y) => y.id === x.id));
+    // a new person starts on the first day that can still change, never in the past
+    proposeTeam(added ? updateStaff(next, added.id, { activeFrom: editableStart() }) : next, `Nueva persona: ${name.trim()}`);
+  };
+  /** "Eliminar" = baja from the first editable day: they stay in past months and disappear from future ones. */
+  const removePerson = (id: string) => {
+    const person = staff.find((x) => x.id === id);
+    proposeTeam(updateStaff(staff, id, { activeTo: day(editableStart(), -1) }), `${person?.name}: baja`);
+  };
 
   const staffRemote = useRemoteStaff({
     auth,
@@ -176,9 +216,35 @@ export function ScheduleApp() {
     },
   });
 
+  // --- day off / holidays requests: plan the whole month around them and show a preview first
+  const requestDays = (staffId: string, from: string, kind: "D" | "V", days: number) => {
+    const person = staff.find((x) => x.id === staffId);
+    const all = Object.keys(h.present[staffId] ?? {}).sort();
+    const to = all[Math.min(all.indexOf(from) + days - 1, all.length - 1)] ?? from;
+    const result = planDayOff(
+      { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined },
+      staffId,
+      from,
+      kind,
+      to,
+    );
+    const label = kind === "V" ? "Vacaciones" : "Libre solicitado";
+    setPlan({
+      plan: result,
+      title: `${label} · ${person?.name} · ${Number(from.slice(8))}${to !== from ? `–${Number(to.slice(8))}` : ""} ${MONTHS[ym.month - 1].toLowerCase()}`,
+    });
+  };
+  const applyPlan = () => {
+    if (!plan) return;
+    if (plan.team) saveTeam(plan.team);
+    dispatch({ type: "replace", schedule: plan.plan.schedule });
+    setPlan(null);
+  };
+  const previewCells = useMemo(() => new Set(plan && !plan.team ? plan.plan.changes.map((c) => `${c.staffId}|${c.date}`) : []), [plan]);
+
   const fileBase = `horario-${ym.year}-${String(ym.month).padStart(2, "0")}`;
   const exportCSV = () =>
-    downloadText(`${fileBase}.csv`, toCSV(h.present, staff, ym.year, ym.month), "text/csv");
+    downloadText(`${fileBase}.csv`, toCSV(h.present, visible, ym.year, ym.month), "text/csv");
   const exportICS = (person: Staff) =>
     downloadText(`${fileBase}-${person.id}.ics`, toICS(h.present, person, ym.year, ym.month), "text/calendar");
 
@@ -267,12 +333,14 @@ export function ScheduleApp() {
             today={today}
             year={ym.year}
             month={ym.month}
-            staff={staff}
-            schedule={h.present}
+            staff={visible}
+            schedule={plan?.team ? h.present : shown}
             validation={validation}
             onEdit={(edits) => dispatch({ type: "edit", edits })}
             onCalendar={exportICS}
             onMove={readOnly ? undefined : onMovePerson}
+            onPlan={readOnly ? undefined : requestDays}
+            preview={previewCells}
           />
         )}
 
@@ -299,14 +367,15 @@ export function ScheduleApp() {
         <TeamPanel
           staff={staff}
           disabled={readOnly}
-          onRename={(id, name) => saveTeam(updateStaff(staff, id, { name }), false)}
-          onRole={(id, role) => saveTeam(changeRole(staff, id, role), true)}
+          onRename={(id, name) => saveTeam(updateStaff(staff, id, { name }))}
+          onRole={(id, role) => proposeTeam(changeRole(staff, id, role), `${staff.find((x) => x.id === id)?.name}: nuevo puesto`)}
           onDates={changeDates}
           onNudge={nudge}
-          onRemove={(id) => saveTeam(removeStaff(staff, id), true)}
-          onAdd={(name, role) => saveTeam(addStaff(staff, { name, role }), true)}
+          onRemove={removePerson}
+          onAdd={addPerson}
         />
       </main>
+      {plan && <PlanDialog plan={plan.plan} title={plan.title} staff={plan.team ?? staff} onApply={applyPlan} onCancel={() => setPlan(null)} />}
     </>
   );
 }

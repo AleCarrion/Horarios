@@ -12,6 +12,8 @@ const MIN_REST = 2;
 const LEGAL_STREAK = 6;
 /** Nobody but mozos (or people on holiday) rests more than this many days in a row. */
 const MAX_REST_RUN = 3;
+/** When repairing a schedule, how much the planner prefers keeping someone on the shift they already had. */
+const BASELINE_KEEP = 80;
 
 /** Spread `count` rest days in blocks of two, evenly through the month. */
 export function autoJcRestDays(dates: string[], count: number): string[] {
@@ -54,7 +56,7 @@ export function planSeniorRests(dates: string[], seniorIds: string[], quota: num
   return rests;
 }
 
-function generateOnce(config: GeneratorConfig): GeneratorResult {
+export function generateOnce(config: GeneratorConfig): GeneratorResult {
   const { year, month, staff } = config;
   const maxStreak = config.maxStreak ?? 5;
   const maxSeniorMornings = config.maxSeniorMornings ?? 6;
@@ -68,11 +70,19 @@ function generateOnce(config: GeneratorConfig): GeneratorResult {
   };
 
   const byId = new Map(staff.map((x) => [x.id, x]));
-  /** "V" (holiday) or "B" (not employed: before their alta / after their baja, or marked by hand). */
-  const offCode = (id: string, d: string) => {
+  const pin = (id: string, d: string) => config.pinned?.[id]?.[d];
+  /** "V" (holiday), "B" (not employed: outside alta/baja or marked by hand) or "D" (pinned libre); undefined when the person may work. */
+  const offCode = (id: string, d: string): "V" | "B" | "D" | undefined => {
     const person = byId.get(id);
-    if (person && !isActive(person, d)) return "B" as const;
+    if (person && !isActive(person, d)) return "B";
+    const p = pin(id, d);
+    if (p === "V" || p === "B" || p === "D") return p;
     return config.unavailable?.[id]?.[d];
+  };
+  /** A pinned working shift (e.g. a frozen "T"), if any. */
+  const pinnedWork = (id: string, d: string) => {
+    const p = pin(id, d);
+    return p && !isOff(p) ? p : undefined;
   };
 
   // Without a night auditor on the team every night has to be covered by receptionists.
@@ -81,18 +91,22 @@ function generateOnce(config: GeneratorConfig): GeneratorResult {
       ? dates
       : (config.jcRestDays ?? autoJcRestDays(dates, config.jcRestCount ?? 10)),
   );
-  // JC's holidays leave their nights uncovered just like rest days do.
-  for (const jc of byRole("night_auditor")) for (const d of dates) if (offCode(jc.id, d)) jcRest.add(d);
+  // JC's holidays leave their nights uncovered just like rest days do; a pinned night is never a rest.
+  for (const jc of byRole("night_auditor"))
+    for (const d of dates) {
+      if (offCode(jc.id, d)) jcRest.add(d);
+      else if (pinnedWork(jc.id, d) === "N") jcRest.delete(d);
+    }
 
   // Fixed staff
   for (const jc of byRole("night_auditor"))
     for (const d of dates) set(jc.id, d, offCode(jc.id, d) ?? (jcRest.has(d) ? "D" : "N"));
   for (const m of byRole("director"))
-    for (const d of dates) set(m.id, d, offCode(m.id, d) ?? (isWeekend(d) ? "D" : "S"));
+    for (const d of dates) set(m.id, d, offCode(m.id, d) ?? pinnedWork(m.id, d) ?? (isWeekend(d) ? "D" : "S"));
   for (const mz of byRole("mozo")) {
     for (const d of dates) {
       const phase = (((diffDays(d, mz.cycleAnchor ?? dates[0]) % 10) + 10) % 10);
-      set(mz.id, d, offCode(mz.id, d) ?? (phase < 5 ? "MZ" : "D"));
+      set(mz.id, d, offCode(mz.id, d) ?? pinnedWork(mz.id, d) ?? (phase < 5 ? "MZ" : "D"));
     }
   }
   const seniors = byRole("senior");
@@ -104,7 +118,12 @@ function generateOnce(config: GeneratorConfig): GeneratorResult {
   );
   for (const sr of seniors) {
     const extra = new Set(config.seniorRestDays?.[sr.id] ?? []);
-    for (const d of dates) set(sr.id, d, offCode(sr.id, d) ?? (planned[sr.id].has(d) || extra.has(d) ? "D" : "P"));
+    for (const d of dates) {
+      // repairing: keep the planned rests of the baseline; otherwise use the senior rest plan
+      const b = config.baseline?.[sr.id]?.[d];
+      const rest = b ? b === "D" : planned[sr.id].has(d) || extra.has(d);
+      set(sr.id, d, offCode(sr.id, d) ?? (rest ? "D" : "P"));
+    }
   }
 
   // Receptionists: day-by-day greedy with hard rest rules and fairness scoring
@@ -137,6 +156,7 @@ function generateOnce(config: GeneratorConfig): GeneratorResult {
     seniors.filter(
       (s) =>
         schedule[s.id][d] === "P" &&
+        !pinnedWork(s.id, d) &&
         s.extraShifts?.includes(slot) &&
         (ignoreCap || seniorCovers[s.id] < coverCap(s)) &&
         !(slot === "M" && seniorLast[s.id] === "T"),
@@ -144,11 +164,25 @@ function generateOnce(config: GeneratorConfig): GeneratorResult {
 
   dates.forEach((d, di) => {
     const slots: ("N" | "T" | "M")[] = jcRest.has(d) ? ["N", "M", "T"] : ["M", "T"];
+    // a pinned shift on a day that would not normally need it still has to be planned (e.g. a pinned night)
+    for (const x of [...recs, ...seniors]) {
+      const w = pinnedWork(x.id, d);
+      if ((w === "N" || w === "M" || w === "T") && !slots.includes(w)) slots.push(w);
+    }
     const taken = new Set<string>();
     for (const slot of slots) {
+      // pinned occupant of this slot (frozen/approved assignment): it stays, nothing to decide
+      const holder = [...recs, ...seniors].find((x) => !taken.has(x.id) && pinnedWork(x.id, d) === slot);
+      if (holder) {
+        taken.add(holder.id);
+        set(holder.id, d, slot);
+        if (holder.role === "senior") seniorCovers[holder.id]++;
+        continue;
+      }
       const eligible = recs.filter((r) => {
         const s = st[r.id];
         if (taken.has(r.id) || s.streak >= maxStreak || offCode(r.id, d)) return false;
+        if (pinnedWork(r.id, d) && pinnedWork(r.id, d) !== slot) return false; // pinned to another slot
         if (slot === "N" && s.N >= maxNights) return false; // share night cover: nobody gets stuck with 6
         if (s.last === "N" && slot !== "N") return false;
         if (slot === "M" && s.last === "T") return false;
@@ -168,6 +202,9 @@ function generateOnce(config: GeneratorConfig): GeneratorResult {
         if (s.last === slot) v += s.blockLen < BLOCK_MIN ? -70 : s.blockLen < s.target ? -35 : 30; // finish a started block, then end it at its target
         else if (s.last !== "D") v += 25; // avoid switching shift without a rest day
         else if (s.restRun < MIN_REST) v += 30; // rest at least MIN_REST days between blocks
+        const was = config.baseline?.[r.id]?.[d];
+        if (was === slot) v -= config.baselineKeep ?? BASELINE_KEEP; // repairing: keep people on the shift they already had
+        else if (was && isOff(was)) v += (config.baselineKeep ?? BASELINE_KEEP) / 2.5; // ...and keep their rest days
         if (s.dRun >= MAX_REST_RUN) v -= 150; // already rested the maximum: must work today
         else if (s.dRun === MAX_REST_RUN - 1) v -= 40;
         return v;
@@ -184,7 +221,8 @@ function generateOnce(config: GeneratorConfig): GeneratorResult {
             score:
               seniorCovers[s.id] * 10 +
               SENIOR_PENALTY +
-              (seniorLast[s.id] === slot ? (seniorBlock[s.id] < BLOCK_MAX - 1 ? -30 : 30) : 0),
+              (seniorLast[s.id] === slot ? (seniorBlock[s.id] < BLOCK_MAX - 1 ? -30 : 30) : 0) -
+              (config.baseline?.[s.id]?.[d] === slot ? (config.baselineKeep ?? BASELINE_KEEP) : 0),
             senior: true,
           });
       candidates.sort((a, b) => a.score - b.score);
@@ -231,6 +269,9 @@ function generateOnce(config: GeneratorConfig): GeneratorResult {
       const code = off ?? (taken.has(r.id) ? (schedule[r.id][d] as ShiftCode) : "D");
       set(r.id, d, code);
       s.dRun = code === "D" ? s.dRun + 1 : 0; // holidays (V/B) do not count towards the 3-day rest limit
+      // Holidays and days before an alta count as "worked" for fairness, so nobody has to catch up after them
+      // (a new hire or someone back from holiday does not absorb everyone else's shifts).
+      if (code === "V" || code === "B") s.worked++;
       if (isOff(code)) {
         s.streak = 0;
         s.blockLen = 0;

@@ -62,7 +62,7 @@ export function validateSchedule(schedule: Schedule, staff: Staff[], year: numbe
         issues.push({ kind: "forbidden", date: d, staffId: s.id, message: `${s.name} no puede hacer ${code}` });
       if (i > 0 && (s.role === "receptionist" || s.extraShifts)) {
         const prev = schedule[s.id][dates[i - 1]];
-        if ((prev === "T" && code === "M") || (s.role === "receptionist" && prev === "N" && code !== "D" && code !== "N"))
+        if ((prev === "T" && code === "M") || (s.role === "receptionist" && prev === "N" && !isOff(code) && code !== "N"))
           issues.push({ kind: "rest", date: d, staffId: s.id, message: `${s.name}: descanso insuficiente el ${d}` });
       }
     });

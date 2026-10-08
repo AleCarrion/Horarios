@@ -33,7 +33,7 @@ export function TeamPanel({ staff, disabled, onRename, onRole, onDates, onNudge,
       </summary>
       <p className="mt-2 text-muted">
         También puedes arrastrar a una persona por el asa de la cuadrícula; aquí tienes los mismos cambios con teclado.
-        Cambiar el puesto o las fechas recalcula el mes alrededor de tus vacaciones y descansos marcados.
+        Los cambios de puesto, altas y bajas se planifican alrededor del resto del horario y te enseñan los cambios antes de aplicarlos.
       </p>
 
       <div className="mt-3 overflow-x-auto">
@@ -96,10 +96,10 @@ export function TeamPanel({ staff, disabled, onRename, onRole, onDates, onNudge,
                           className={`${mini} hover:!bg-red-500/10 hover:!text-red-600`}
                           disabled={disabled}
                           onClick={() => {
-                            if (window.confirm(`¿Eliminar a ${s.name} del equipo? Desaparece de todos los meses. Si solo se va a partir de una fecha, usa la fecha de baja.`)) onRemove(s.id);
+                            if (window.confirm(`¿Dar de baja a ${s.name} desde el primer día que se puede cambiar? Seguirá apareciendo en los meses anteriores y se recalcula el resto.`)) onRemove(s.id);
                           }}
-                          aria-label={`Eliminar a ${s.name}`}
-                          title="Eliminar del equipo"
+                          aria-label={`Dar de baja a ${s.name}`}
+                          title="Dar de baja"
                         >
                           <TrashIcon width={15} height={15} />
                         </button>

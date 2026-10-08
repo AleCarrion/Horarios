@@ -59,6 +59,15 @@ export interface GeneratorConfig {
   seniorRestDays?: Record<string, string[]>;
   /** Planned rest days per senior in the month (default 10, as in the hotel's real rota). */
   seniorRestCount?: number;
+  /**
+   * Cells that must stay exactly as given (frozen days, locked cells, approved requests). D/V/B pin a day off;
+   * M/T/N pin a receptionist's (or covering senior's) shift. Everything else is planned around them.
+   */
+  pinned?: Record<string, Record<string, ShiftCode>>;
+  /** The schedule being repaired: the planner prefers keeping each person on the shift they already had. */
+  baseline?: Schedule;
+  /** How strongly to prefer the baseline (default 80). Higher values change fewer cells but may break block rotation. */
+  baselineKeep?: number;
   /** Fixed non-working days per staff id: "V" vacation or "B" not employed that day. Cover is planned around them. */
   unavailable?: Record<string, Record<string, "V" | "B">>;
   seed?: number;
@@ -88,3 +97,10 @@ export const isOff = (c: ShiftCode | undefined) => !c || c === "D" || c === "V" 
 /** Whether the person is on the roster on that day (alta/baja dates). */
 export const isActive = (s: Pick<Staff, "activeFrom" | "activeTo">, date: string) =>
   (!s.activeFrom || date >= s.activeFrom) && (!s.activeTo || date <= s.activeTo);
+
+/** Whether the person is on the roster on any day of that month (alta/baja dates). */
+export const activeInMonth = (s: Pick<Staff, "activeFrom" | "activeTo">, year: number, month: number) => {
+  const first = `${year}-${String(month).padStart(2, "0")}-01`;
+  const last = `${year}-${String(month).padStart(2, "0")}-31`;
+  return (!s.activeFrom || s.activeFrom <= last) && (!s.activeTo || s.activeTo >= first);
+};
