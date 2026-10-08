@@ -16,11 +16,13 @@ const MAX_REST_RUN = 3;
 const BASELINE_KEEP = 80;
 
 /** Spread `count` rest days in blocks of two, evenly through the month. */
-export function autoJcRestDays(dates: string[], count: number): string[] {
+export function autoJcRestDays(dates: string[], count: number, startStreak = 0): string[] {
   const pairs = Math.floor(count / 2);
   const picked = new Set<number>();
   for (let k = 0; k < pairs; k++) {
-    const start = Math.floor(((k + 0.5) * dates.length) / pairs);
+    let start = Math.floor(((k + 0.5) * dates.length) / pairs);
+    // the first rest must come early enough that nobody exceeds 5 days in a row counting the previous month
+    if (k === 0) start = Math.max(0, Math.min(start, 5 - startStreak));
     picked.add(start);
     picked.add(start + 1);
   }
@@ -33,7 +35,13 @@ export function autoJcRestDays(dates: string[], count: number): string[] {
  * alternate between seniors, with a work day or two in between, so at least one senior is always in
  * and nobody works more than ~5 days in a row. Mirrors the hotel's real rota (10 rest days each).
  */
-export function planSeniorRests(dates: string[], seniorIds: string[], quota: number, seed = 0): Record<string, Set<string>> {
+export function planSeniorRests(
+  dates: string[],
+  seniorIds: string[],
+  quota: number,
+  seed = 0,
+  startStreaks: Record<string, number> = {},
+): Record<string, Set<string>> {
   const n = seniorIds.length;
   const rests: Record<string, Set<string>> = Object.fromEntries(seniorIds.map((id) => [id, new Set<string>()]));
   if (!n || quota <= 0) return rests;
@@ -45,12 +53,22 @@ export function planSeniorRests(dates: string[], seniorIds: string[], quota: num
   const gaps = Array.from({ length: blocks + 1 }, (_, i) => gap + ((i + seed) % (blocks + 1) < extra ? 1 : 0));
   extra = 0;
   const remaining = Object.fromEntries(seniorIds.map((id) => [id, quota]));
+  // Whoever arrives with the longest streak rests first; each senior's first block starts early enough to stay <= 5 days.
+  const needy = Math.max(0, ...seniorIds.map((id) => startStreaks[id] ?? 0)) >= 3;
+  const order = needy ? [...seniorIds].sort((a, b) => (startStreaks[b] ?? 0) - (startStreaks[a] ?? 0)) : seniorIds;
+  const firstDone = new Set<string>();
   let pos = gaps[0];
+  let prevEnd = 0;
   for (let k = 0; k < blocks; k++) {
-    const id = seniorIds[(k + seed) % n];
+    const id = needy ? order[k % n] : seniorIds[(k + seed) % n];
+    if (!firstDone.has(id)) {
+      pos = Math.max(prevEnd, Math.min(pos, 5 - (startStreaks[id] ?? 0)));
+      firstDone.add(id);
+    }
     const len = Math.min(2, remaining[id]);
     for (let j = 0; j < len && pos + j < dates.length; j++) rests[id].add(dates[pos + j]);
     remaining[id] -= len;
+    prevEnd = pos + len;
     pos += len + gaps[k + 1];
   }
   return rests;
@@ -70,6 +88,22 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
   };
 
   const byId = new Map(staff.map((x) => [x.id, x]));
+
+  /** What a person was doing right before day 1 (from the previous month), to carry streaks and blocks over. */
+  const tail = (id: string) => {
+    const row = config.history?.[id];
+    const prior = row ? Object.keys(row).filter((x) => x < dates[0]).sort() : [];
+    const codes = prior.map((x) => row![x]);
+    const lastRaw = codes.at(-1) ?? config.prevDay?.[id];
+    let streak = 0;
+    while (streak < codes.length && !isOff(codes[codes.length - 1 - streak])) streak++;
+    let dRun = 0;
+    while (dRun < codes.length && codes[codes.length - 1 - dRun] === "D") dRun++;
+    let blockLen = lastRaw && !isOff(lastRaw) ? 1 : 0;
+    while (blockLen > 0 && blockLen < codes.length && codes[codes.length - 1 - blockLen] === lastRaw) blockLen++;
+    const last = (lastRaw && !isOff(lastRaw) ? lastRaw : "D") as ShiftCode;
+    return { last, streak, dRun, blockLen, restRun: dRun > 0 ? dRun : MIN_REST };
+  };
   const pin = (id: string, d: string) => config.pinned?.[id]?.[d];
   /** "V" (holiday), "B" (not employed: outside alta/baja or marked by hand) or "D" (pinned libre); undefined when the person may work. */
   const offCode = (id: string, d: string): "V" | "B" | "D" | undefined => {
@@ -89,7 +123,8 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
   const jcRest = new Set(
     byRole("night_auditor").length === 0
       ? dates
-      : (config.jcRestDays ?? autoJcRestDays(dates, config.jcRestCount ?? 10)),
+      : (config.jcRestDays ??
+        autoJcRestDays(dates, config.jcRestCount ?? 10, byRole("night_auditor").length ? tail(byRole("night_auditor")[0].id).streak : 0)),
   );
   // JC's holidays leave their nights uncovered just like rest days do; a pinned night is never a rest.
   for (const jc of byRole("night_auditor"))
@@ -115,6 +150,7 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
     seniors.map((x) => x.id),
     config.seniorRestCount ?? 10,
     seed,
+    Object.fromEntries(seniors.map((x) => [x.id, tail(x.id).streak])),
   );
   for (const sr of seniors) {
     const extra = new Set(config.seniorRestDays?.[sr.id] ?? []);
@@ -131,24 +167,16 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
   const st = Object.fromEntries(
     recs.map((r) => [
       r.id,
-      {
-        last: (config.prevDay?.[r.id] ?? "D") as ShiftCode,
-        streak: 0,
-        worked: 0,
-        M: 0,
-        T: 0,
-        N: 0,
-        blockLen: config.prevDay?.[r.id] && config.prevDay[r.id] !== "D" ? 1 : 0,
-        restRun: MIN_REST,
-        dRun: 0,
-        target: BLOCK_MIN,
-      },
+      (() => {
+        const t = tail(r.id);
+        return { last: t.last, streak: t.streak, worked: 0, M: 0, T: 0, N: 0, blockLen: t.blockLen, restRun: t.restRun, dRun: t.dRun, target: BLOCK_MIN };
+      })(),
     ]),
   );
   const maxNights = Math.max(1, Math.ceil(jcRest.size / Math.max(1, recs.length)));
   const seniorCovers: Record<string, number> = Object.fromEntries(seniors.map((s) => [s.id, 0]));
   const seniorLast: Record<string, ShiftCode> = Object.fromEntries(
-    seniors.map((s) => [s.id, (config.prevDay?.[s.id] ?? "D") as ShiftCode]),
+    seniors.map((s) => [s.id, tail(s.id).last]),
   );
   const seniorBlock: Record<string, number> = Object.fromEntries(seniors.map((s) => [s.id, 0]));
   const coverCap = (s: Staff) => s.maxCovers ?? maxSeniorMornings;
@@ -322,7 +350,7 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
   let best: { result: GeneratorResult; cost: number } | null = null;
   for (let i = 0; i < ATTEMPTS; i++) {
     const result = generateOnce({ ...config, seed: seed + i });
-    const issues = validateSchedule(result.schedule, config.staff, config.year, config.month).issues;
+    const issues = validateSchedule(result.schedule, config.staff, config.year, config.month, config.history).issues;
     const hard = issues.filter((x) => x.kind === "coverage" || x.kind === "restStreak" || x.kind === "streak").length;
     const soft = result.warnings.filter((w) => w.kind === "cap" || w.kind === "streak").length;
     const cost = hard * 1000 + soft;

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { generateSchedule } from "@/lib/domain/generator";
 import { applyEdits, applyRemote, createHistory, redo, undo, type Edit } from "@/lib/domain/history";
 import { DEFAULT_STAFF } from "@/lib/domain/roster";
 import { addStaff, changeRole, moveStaff, updateStaff } from "@/lib/domain/team";
+import { clearScheduleCache, nextStored, peekFor, prevMonth, readStored, scheduleForAsync, storageKey } from "@/lib/monthStore";
 import { readRoster, writeRoster } from "@/lib/staffStore";
 import { useRemoteStaff } from "@/lib/useRemoteStaff";
 import { diffSchedules } from "@/lib/sync";
@@ -50,14 +51,10 @@ function reducer(h: ReturnType<typeof createHistory>, a: Action) {
   }
 }
 
-const storageKey = (y: number, m: number) => `horarios:${y}-${m}`;
-
+/** Immediate content for a month: saved, already planned, or a quick plan without history (upgraded right after). */
 function load(y: number, m: number): Schedule {
-  try {
-    const raw = localStorage.getItem(storageKey(y, m));
-    if (raw) return JSON.parse(raw) as Schedule;
-  } catch {}
-  return generateSchedule({ year: y, month: m, staff: readRoster() }).schedule;
+  const staff = readRoster();
+  return peekFor(y, m, staff) ?? generateSchedule({ year: y, month: m, staff }).schedule;
 }
 
 export function ScheduleApp() {
@@ -91,19 +88,40 @@ export function ScheduleApp() {
   });
   const readOnly = remoteConfigured && !remote.canEdit;
 
+  // The previous month (streaks and rest runs carry over); planned in the background so the page never freezes.
+  const [history, setHistory] = useState<Schedule | undefined>(undefined);
+  const dirty = useRef(false);
+  useEffect(() => {
+    dirty.current = h.changes.length > 0;
+  });
+
   useEffect(() => {
     dispatch({ type: "reset", schedule: load(ym.year, ym.month) });
+    let alive = true;
+    const p = prevMonth(ym.year, ym.month);
+    void (async () => {
+      const prev = await scheduleForAsync(p.y, p.m, readRoster(), () => alive);
+      if (!alive) return;
+      setHistory(prev ?? undefined);
+      const full = await scheduleForAsync(ym.year, ym.month, readRoster(), () => alive);
+      // nothing saved and nothing edited yet: show the plan that continues from last month
+      if (alive && full && !dirty.current && !readStored(ym.year, ym.month)) dispatch({ type: "reset", schedule: full });
+    })();
+    return () => {
+      alive = false;
+    };
   }, [ym]);
 
   useEffect(() => {
     if (!h.changes.length) return;
-    try { localStorage.setItem(storageKey(ym.year, ym.month), JSON.stringify(h.present)); } catch {}
+    try { localStorage.setItem(storageKey(ym.year, ym.month), JSON.stringify(h.present)); clearScheduleCache(); } catch {}
   }, [h.present, h.changes.length, ym]);
+
 
   const shown = plan?.plan.schedule ?? h.present; // while a request is previewed the grid shows it
   const validation = useMemo(
-    () => validateSchedule(shown, visible, ym.year, ym.month),
-    [shown, ym, visible],
+    () => validateSchedule(shown, visible, ym.year, ym.month, history),
+    [shown, ym, visible, history],
   );
 
   const stats = useMemo(() => {
@@ -123,7 +141,7 @@ export function ScheduleApp() {
     });
 
   const regenerate = (list: Staff[] = staff) => {
-    try { localStorage.removeItem(storageKey(ym.year, ym.month)); } catch {}
+    try { localStorage.removeItem(storageKey(ym.year, ym.month)); clearScheduleCache(); } catch {}
     // Holidays (V), days out of the roster (B) and JC's rest days are inputs: edit them in the grid, then regenerate around them.
     const unavailable: Record<string, Record<string, "V" | "B">> = {};
     for (const p of list) {
@@ -141,6 +159,7 @@ export function ScheduleApp() {
         month: ym.month,
         staff: list,
         seed: Date.now() % 97,
+        history,
         unavailable,
         jcRestDays: night
           ? Object.entries(h.present[night.id] ?? {}).filter(([, c]) => c === "D").map(([d]) => d)
@@ -170,7 +189,7 @@ export function ScheduleApp() {
   const proposeTeam = (next: Staff[], title: string) => {
     if (next === staff) return;
     const result = planRestructure(
-      { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined },
+      { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month) },
       next,
       monthStart,
     );
@@ -222,7 +241,7 @@ export function ScheduleApp() {
     const all = Object.keys(h.present[staffId] ?? {}).sort();
     const to = all[Math.min(all.indexOf(from) + days - 1, all.length - 1)] ?? from;
     const result = planDayOff(
-      { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined },
+      { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month) },
       staffId,
       from,
       kind,
@@ -237,7 +256,7 @@ export function ScheduleApp() {
   const requestSwap = (a: string, b: string, date: string, returnDate?: string) => {
     const pa = staff.find((x) => x.id === a);
     const pb = staff.find((x) => x.id === b);
-    const result = planShiftSwap({ year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined }, a, b, date, returnDate);
+    const result = planShiftSwap({ year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month) }, a, b, date, returnDate);
     setPlan({
       plan: result,
       title: `Cambio de turno · ${pa?.name} ↔ ${pb?.name} · ${Number(date.slice(8))}${returnDate ? ` y ${Number(returnDate.slice(8))}` : ""} ${MONTHS[ym.month - 1].toLowerCase()}`,

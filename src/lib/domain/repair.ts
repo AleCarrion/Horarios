@@ -15,6 +15,10 @@ export interface RepairContext {
   protectedDays?: number;
   /** Cells the manager locked: staffId -> date -> true. */
   locked?: Record<string, Record<string, boolean>>;
+  /** The previous month: streaks and rest runs carry over into this one. */
+  history?: Schedule;
+  /** The next month, if it already exists: a change at the end of this month must not break its first days. */
+  next?: Schedule;
   /** Recommended notice for a request, in days (default 30). Short notice is reported, never blocked. */
   noticeDays?: number;
 }
@@ -81,14 +85,29 @@ function diff(ctx: RepairContext, next: Schedule): CellChange[] {
   return out;
 }
 
+const nextYm = (ctx: RepairContext) => (ctx.month === 12 ? { y: ctx.year + 1, m: 1 } : { y: ctx.year, m: ctx.month + 1 });
+const BOUNDARY_KINDS: Issue["kind"][] = ["streak", "restStreak", "rest"];
+
+/** Issues that appear in the first days of the next month because of how this month ends. */
+function boundaryIssues(ctx: RepairContext, staff: Staff[], schedule: Schedule): Issue[] {
+  if (!ctx.next) return [];
+  const { y, m } = nextYm(ctx);
+  return validateSchedule(ctx.next, staff, y, m, schedule).issues.filter((i) => BOUNDARY_KINDS.includes(i.kind) && i.date <= `${y}-${String(m).padStart(2, "0")}-08`);
+}
+
 const baseIssueKeys = (ctx: RepairContext) =>
-  new Set(validateSchedule(ctx.schedule, ctx.staff, ctx.year, ctx.month).issues.map(issueKey));
+  new Set([
+    ...validateSchedule(ctx.schedule, ctx.staff, ctx.year, ctx.month, ctx.history).issues.map(issueKey),
+    ...boundaryIssues(ctx, ctx.staff, ctx.schedule).map((i) => `next|${issueKey(i)}`),
+  ]);
 
 /** Hard issues that did not exist before the change (so pre-existing manual quirks don't block it). */
 function newHard(ctx: RepairContext, next: Schedule, known: Set<string> | null): Issue[] {
-  return validateSchedule(next, ctx.staff, ctx.year, ctx.month).issues.filter(
+  const own = validateSchedule(next, ctx.staff, ctx.year, ctx.month, ctx.history).issues.filter(
     (i) => HARD.includes(i.kind) && (!known || !known.has(issueKey(i))),
   );
+  const edge = boundaryIssues(ctx, ctx.staff, next).filter((i) => !known || !known.has(`next|${issueKey(i)}`));
+  return [...own, ...edge];
 }
 
 function levelOf(hard: Issue[], soft: Warning[]): Level {
@@ -135,6 +154,7 @@ function replan(ctx: RepairContext, staff: Staff[], pinned: Record<string, Recor
       staff,
       seed,
       pinned,
+      history: ctx.history,
       baseline: ctx.schedule,
       jcRestDays: night
         ? monthDates(ctx.year, ctx.month).filter((x) => ctx.schedule[night.id]?.[x] === "D")
