@@ -86,6 +86,14 @@ test("ausencia imprevista: la vista previa dice a quién avisar", async ({ page,
   await expect(page.locator(`[data-row][data-col="${day}"]`).nth(3)).toHaveAttribute("aria-label", /Ausencia/);
 });
 
+test("el resumen del mes enseña a todas las personas", async ({ page }) => {
+  await open(page);
+  await page.getByText("Resumen del mes por persona").click();
+  const table = page.getByRole("table", { name: /Turnos, libres/ });
+  await expect(table).toBeVisible();
+  await expect(table.getByRole("row")).toHaveCount(10); // header + 9 people
+});
+
 test("la página de equipo lista la plantilla", async ({ page }) => {
   await page.goto("/equipo");
   await expect(page.getByRole("heading", { name: "Equipo" })).toBeVisible();

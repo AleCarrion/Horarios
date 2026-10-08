@@ -35,6 +35,7 @@ import { AppNav } from "./AppNav";
 import { MobileTabBar } from "./MobileTabBar";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { PlanDialog } from "./PlanDialog";
+import { MonthSummary } from "./MonthSummary";
 import { ScheduleGrid } from "./ScheduleGrid";
 import { StatCards } from "./StatCards";
 
@@ -606,6 +607,8 @@ export function ScheduleApp() {
             </>
           )}
         </section>
+
+        <MonthSummary schedule={shown} staff={visible} year={ym.year} month={ym.month} />
 
       </main>
       <MobileTabBar pending={requests.filter((r) => r.status === "pending").length} onRequests={() => setPanelOpen(true)} />
