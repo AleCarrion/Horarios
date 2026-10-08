@@ -11,9 +11,9 @@ export interface History {
   past: Schedule[];
   present: Schedule;
   future: Schedule[];
-  /** Net list of edits applied (for persistence / audit); undo removes the last one. */
-  changes: Change[];
-  undone: Change[];
+  /** Net list of edit groups applied (a multi-day edit is one group); undo removes the last group. */
+  changes: Change[][];
+  undone: Change[][];
 }
 
 export const createHistory = (present: Schedule): History => ({
@@ -24,17 +24,28 @@ export const createHistory = (present: Schedule): History => ({
   undone: [],
 });
 
+export interface Edit {
+  staffId: string;
+  date: string;
+  to: ShiftCode;
+}
+
+/** Applies several cells as ONE undo step (e.g. "vacaciones" for 14 days). */
+export function applyEdits(h: History, edits: Edit[]): History {
+  const changes: Change[] = [];
+  const next: Schedule = { ...h.present };
+  for (const { staffId, date, to } of edits) {
+    const from = next[staffId]?.[date];
+    if (from === to) continue;
+    next[staffId] = { ...next[staffId], [date]: to };
+    changes.push({ staffId, date, from, to });
+  }
+  if (!changes.length) return h;
+  return { past: [...h.past, h.present], present: next, future: [], changes: [...h.changes, changes], undone: [] };
+}
+
 export function applyEdit(h: History, staffId: string, date: string, to: ShiftCode): History {
-  const from = h.present[staffId]?.[date];
-  if (from === to) return h;
-  const next: Schedule = { ...h.present, [staffId]: { ...h.present[staffId], [date]: to } };
-  return {
-    past: [...h.past, h.present],
-    present: next,
-    future: [],
-    changes: [...h.changes, { staffId, date, from, to }],
-    undone: [],
-  };
+  return applyEdits(h, [{ staffId, date, to }]);
 }
 
 export function undo(h: History): History {

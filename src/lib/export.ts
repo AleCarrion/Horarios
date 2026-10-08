@@ -1,5 +1,5 @@
 import { monthDates, toISO } from "./domain/dates";
-import { SHIFTS, displayCode, type Schedule, type ShiftCode, type Staff } from "./domain/types";
+import { SHIFTS, displayCode, isOff, type Schedule, type ShiftCode, type Staff } from "./domain/types";
 
 /** Semicolon-separated with BOM so Spanish-locale Excel opens it correctly. */
 export function toCSV(schedule: Schedule, staff: Staff[], year: number, month: number): string {
@@ -38,7 +38,7 @@ export function toICS(schedule: Schedule, person: Staff, year: number, month: nu
   ];
   for (const d of monthDates(year, month)) {
     const code = schedule[person.id]?.[d];
-    if (!code || code === "D") continue;
+    if (!code || isOff(code)) continue;
     const def = SHIFTS[code];
     const endDay = def.end < def.start ? nextDay(d) : d;
     lines.push(

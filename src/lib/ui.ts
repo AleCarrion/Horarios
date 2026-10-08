@@ -9,6 +9,8 @@ export const SHIFT_STYLE: Record<ShiftCode, string> = {
   P: "bg-[#ffc000] text-black",
   MZ: "bg-[#00b0f0] text-black",
   D: "bg-[#92d050] text-black",
+  V: "bg-[#ff0000] text-black",
+  B: "bg-black text-black",
 };
 
 export const MONTHS = [

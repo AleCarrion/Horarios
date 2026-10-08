@@ -1,4 +1,5 @@
-export type ShiftCode = "M" | "T" | "N" | "S" | "P" | "MZ" | "D";
+/** V = vacaciones, B = fuera de plantilla (not employed that day). Both count as non-working. */
+export type ShiftCode = "M" | "T" | "N" | "S" | "P" | "MZ" | "D" | "V" | "B";
 
 export type Role = "night_auditor" | "director" | "senior" | "receptionist" | "mozo";
 
@@ -29,6 +30,8 @@ export const SHIFTS: Record<ShiftCode, ShiftDef> = {
   P: { code: "P", label: "Partido", start: "09:15", end: "17:15" },
   MZ: { code: "MZ", label: "Mozo", start: "11:00", end: "19:00" },
   D: { code: "D", label: "Libre", start: "", end: "" },
+  V: { code: "V", label: "Vacaciones", start: "", end: "" },
+  B: { code: "B", label: "Fuera de plantilla", start: "", end: "" },
 };
 
 /** staffId -> (YYYY-MM-DD -> shift) */
@@ -52,6 +55,8 @@ export interface GeneratorConfig {
   seniorRestDays?: Record<string, string[]>;
   /** Planned rest days per senior in the month (default 10, as in the hotel's real rota). */
   seniorRestCount?: number;
+  /** Fixed non-working days per staff id: "V" vacation or "B" not employed that day. Cover is planned around them. */
+  unavailable?: Record<string, Record<string, "V" | "B">>;
   seed?: number;
 }
 
@@ -66,9 +71,12 @@ export interface Warning {
 export interface GeneratorResult {
   schedule: Schedule;
   warnings: Warning[];
-  stats: Record<string, { worked: number; rest: number; M: number; T: number; N: number }>;
+  stats: Record<string, { worked: number; rest: number; off: number; M: number; T: number; N: number }>;
 }
 
 /** Letter shown to users, matching the hotel's Excel: L for libre, P for the mozo shift. */
-export const DISPLAY_CODE: Record<ShiftCode, string> = { M: "M", T: "T", N: "N", S: "S", P: "P", MZ: "P", D: "L" };
+export const DISPLAY_CODE: Record<ShiftCode, string> = { M: "M", T: "T", N: "N", S: "S", P: "P", MZ: "P", D: "L", V: "V", B: "" };
 export const displayCode = (c: ShiftCode) => DISPLAY_CODE[c];
+
+/** True for any day without work (libre, vacaciones, fuera de plantilla). */
+export const isOff = (c: ShiftCode | undefined) => !c || c === "D" || c === "V" || c === "B";

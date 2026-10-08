@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useReducer, useState } from "react";
 import { generateSchedule } from "@/lib/domain/generator";
-import { applyEdit, applyRemote, createHistory, redo, undo } from "@/lib/domain/history";
-import { DEFAULT_STAFF } from "@/lib/domain/roster";
-import type { Schedule } from "@/lib/domain/types";
+import { applyEdits, applyRemote, createHistory, redo, undo, type Edit } from "@/lib/domain/history";
+import { DEFAULT_STAFF, EXTRA_RECEPTIONIST } from "@/lib/domain/roster";
+import type { Schedule, ShiftCode, Staff } from "@/lib/domain/types";
 import { validateSchedule } from "@/lib/domain/validate";
 import { MONTHS, SHIFT_STYLE } from "@/lib/ui";
 import { SHIFTS, displayCode } from "@/lib/domain/types";
@@ -18,15 +18,15 @@ import { ScheduleGrid } from "./ScheduleGrid";
 
 type Action =
   | { type: "reset"; schedule: Schedule }
-  | { type: "edit"; staffId: string; date: string; code: Parameters<typeof applyEdit>[3] }
-  | { type: "remote"; staffId: string; date: string; code: Parameters<typeof applyEdit>[3] }
+  | { type: "edit"; edits: Edit[] }
+  | { type: "remote"; staffId: string; date: string; code: ShiftCode }
   | { type: "undo" }
   | { type: "redo" };
 
 function reducer(h: ReturnType<typeof createHistory>, a: Action) {
   switch (a.type) {
     case "reset": return createHistory(a.schedule);
-    case "edit": return applyEdit(h, a.staffId, a.date, a.code);
+    case "edit": return applyEdits(h, a.edits);
     case "remote": return applyRemote(h, a.staffId, a.date, a.code);
     case "undo": return undo(h);
     case "redo": return redo(h);
@@ -51,6 +51,14 @@ export function ScheduleApp() {
     createHistory(generateSchedule({ year: ym.year, month: ym.month, staff: DEFAULT_STAFF }).schedule),
   );
 
+  // The temporary receptionist is part of the month only when her row exists in the schedule.
+  const hasExtra = Boolean(h.present[EXTRA_RECEPTIONIST.id]);
+  const staff = useMemo<Staff[]>(() => {
+    if (!hasExtra) return DEFAULT_STAFF;
+    const i = DEFAULT_STAFF.findIndex((x) => x.id === "marcos") + 1;
+    return [...DEFAULT_STAFF.slice(0, i), EXTRA_RECEPTIONIST, ...DEFAULT_STAFF.slice(i)];
+  }, [hasExtra]);
+
   const auth = useAuth();
   const remote = useRemoteSchedule({
     year: ym.year,
@@ -72,8 +80,8 @@ export function ScheduleApp() {
   }, [h.present, h.changes.length, ym]);
 
   const validation = useMemo(
-    () => validateSchedule(h.present, DEFAULT_STAFF, ym.year, ym.month),
-    [h.present, ym],
+    () => validateSchedule(h.present, staff, ym.year, ym.month),
+    [h.present, ym, staff],
   );
 
   const shiftMonth = (delta: number) =>
@@ -82,16 +90,24 @@ export function ScheduleApp() {
       return { year: d.getFullYear(), month: d.getMonth() + 1 };
     });
 
-  const regenerate = () => {
+  const regenerate = (withExtra = hasExtra) => {
     try { localStorage.removeItem(storageKey(ym.year, ym.month)); } catch {}
+    const list = withExtra
+      ? [...DEFAULT_STAFF.slice(0, 7), EXTRA_RECEPTIONIST, ...DEFAULT_STAFF.slice(7)]
+      : DEFAULT_STAFF;
+    // Holidays (V), days out of the roster (B) and JC's rest days are inputs: edit them in the grid, then regenerate around them.
+    const unavailable: Record<string, Record<string, "V" | "B">> = {};
+    for (const p of list)
+      for (const [d, c] of Object.entries(h.present[p.id] ?? {}))
+        if (c === "V" || c === "B") (unavailable[p.id] ??= {})[d] = c;
     dispatch({
       type: "reset",
       schedule: generateSchedule({
         year: ym.year,
         month: ym.month,
-        staff: DEFAULT_STAFF,
+        staff: list,
         seed: Date.now() % 97,
-        // JC's rest days are an input (e.g. a course month): edit them in the grid, then regenerate around them.
+        unavailable,
         jcRestDays: Object.entries(h.present.jc ?? {}).filter(([, c]) => c === "D").map(([d]) => d),
       }).schedule,
     });
@@ -99,9 +115,9 @@ export function ScheduleApp() {
 
   const fileBase = `horario-${ym.year}-${String(ym.month).padStart(2, "0")}`;
   const exportCSV = () =>
-    downloadText(`${fileBase}.csv`, toCSV(h.present, DEFAULT_STAFF, ym.year, ym.month), "text/csv");
+    downloadText(`${fileBase}.csv`, toCSV(h.present, staff, ym.year, ym.month), "text/csv");
   const exportICS = () => {
-    const person = DEFAULT_STAFF.find((p) => p.id === icsPerson)!;
+    const person = staff.find((p) => p.id === icsPerson) ?? staff[0];
     downloadText(`${fileBase}-${person.id}.ics`, toICS(h.present, person, ym.year, ym.month), "text/calendar");
   };
 
@@ -127,7 +143,7 @@ export function ScheduleApp() {
           <button
             disabled={readOnly}
             className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-brand"
-            onClick={regenerate}
+            onClick={() => regenerate()}
           >
             Generar automático
           </button>
@@ -149,13 +165,24 @@ export function ScheduleApp() {
           onChange={(e) => setIcsPerson(e.target.value)}
           className="rounded-lg border border-brand/30 bg-transparent px-2 py-2 text-sm"
         >
-          {DEFAULT_STAFF.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          {staff.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         <button className={btn} onClick={exportICS}>iCal (.ics)</button>
       </div>
 
+      <label className="flex items-center gap-2 text-sm print:hidden">
+        <input
+          type="checkbox"
+          checked={hasExtra}
+          disabled={readOnly}
+          onChange={(e) => regenerate(e.target.checked)}
+          className="h-4 w-4"
+        />
+        Recepcionista de refuerzo ({EXTRA_RECEPTIONIST.name}) para cubrir vacaciones
+      </label>
+
       <ul className="flex flex-wrap gap-2 text-xs" aria-label="Leyenda">
-        {(["M", "T", "N", "S", "P", "MZ", "D"] as const).map((c) => (
+        {(["M", "T", "N", "S", "P", "MZ", "D", "V"] as const).map((c) => (
           <li key={c} className={`rounded px-2 py-1 font-semibold ${SHIFT_STYLE[c]}`}>
             {displayCode(c)} {SHIFTS[c].label} {SHIFTS[c].start && `${SHIFTS[c].start}-${SHIFTS[c].end}`}
           </li>
@@ -172,10 +199,10 @@ export function ScheduleApp() {
         title={MONTHS[ym.month - 1]}
         year={ym.year}
         month={ym.month}
-        staff={DEFAULT_STAFF}
+        staff={staff}
         schedule={h.present}
         validation={validation}
-        onEdit={(staffId, date, code) => dispatch({ type: "edit", staffId, date, code })}
+        onEdit={(edits) => dispatch({ type: "edit", edits })}
       />
       )}
 

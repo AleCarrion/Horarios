@@ -1,5 +1,5 @@
 import { diffDays, isWeekend, monthDates } from "./dates";
-import type { GeneratorConfig, GeneratorResult, Schedule, ShiftCode, Staff, Warning } from "./types";
+import { isOff, type GeneratorConfig, type GeneratorResult, type Schedule, type ShiftCode, type Staff, type Warning } from "./types";
 
 /** Extra "workload days" a covering senior counts as having, so receptionists are preferred but seniors still share M/T. */
 const SENIOR_PENALTY = 100;
@@ -64,17 +64,24 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
     schedule[id][d] = c;
   };
 
+  /** "V"/"B" if the person is on holiday / not employed that day. */
+  const offCode = (id: string, d: string) => config.unavailable?.[id]?.[d];
+
   const jcRest = new Set(
     config.jcRestDays ?? autoJcRestDays(dates, config.jcRestCount ?? 10),
   );
+  // JC's holidays leave their nights uncovered just like rest days do.
+  for (const jc of byRole("night_auditor")) for (const d of dates) if (offCode(jc.id, d)) jcRest.add(d);
 
   // Fixed staff
-  for (const jc of byRole("night_auditor")) for (const d of dates) set(jc.id, d, jcRest.has(d) ? "D" : "N");
-  for (const m of byRole("director")) for (const d of dates) set(m.id, d, isWeekend(d) ? "D" : "S");
+  for (const jc of byRole("night_auditor"))
+    for (const d of dates) set(jc.id, d, offCode(jc.id, d) ?? (jcRest.has(d) ? "D" : "N"));
+  for (const m of byRole("director"))
+    for (const d of dates) set(m.id, d, offCode(m.id, d) ?? (isWeekend(d) ? "D" : "S"));
   for (const mz of byRole("mozo")) {
     for (const d of dates) {
       const phase = (((diffDays(d, mz.cycleAnchor ?? dates[0]) % 10) + 10) % 10);
-      set(mz.id, d, phase < 5 ? "MZ" : "D");
+      set(mz.id, d, offCode(mz.id, d) ?? (phase < 5 ? "MZ" : "D"));
     }
   }
   const seniors = byRole("senior");
@@ -86,7 +93,7 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
   );
   for (const sr of seniors) {
     const extra = new Set(config.seniorRestDays?.[sr.id] ?? []);
-    for (const d of dates) set(sr.id, d, planned[sr.id].has(d) || extra.has(d) ? "D" : "P");
+    for (const d of dates) set(sr.id, d, offCode(sr.id, d) ?? (planned[sr.id].has(d) || extra.has(d) ? "D" : "P"));
   }
 
   // Receptionists: day-by-day greedy with hard rest rules and fairness scoring
@@ -129,7 +136,7 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
     for (const slot of slots) {
       const eligible = recs.filter((r) => {
         const s = st[r.id];
-        if (taken.has(r.id) || s.streak >= maxStreak) return false;
+        if (taken.has(r.id) || s.streak >= maxStreak || offCode(r.id, d)) return false;
         if (slot === "N" && s.N >= maxNights) return false; // share night cover: nobody gets stuck with 6
         if (s.last === "N" && slot !== "N") return false;
         if (slot === "M" && s.last === "T") return false;
@@ -138,7 +145,7 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
       // M must not take the last receptionist able to do T unless a senior can back T up.
       const canDoT = (r: Staff) => {
         const s = st[r.id];
-        return !taken.has(r.id) && s.last !== "N" && s.streak < maxStreak;
+        return !taken.has(r.id) && !offCode(r.id, d) && s.last !== "N" && s.streak < maxStreak;
       };
       const tBackup = slot === "M" && seniorsFor("T", d).length > 0;
       const pool =
@@ -173,7 +180,7 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
         const relaxed = recs
           .filter((r) => {
             const s = st[r.id];
-            if (taken.has(r.id) || s.streak >= LEGAL_STREAK) return false;
+            if (taken.has(r.id) || s.streak >= LEGAL_STREAK || offCode(r.id, d)) return false;
             if (s.last === "N" && slot !== "N") return false;
             return !(slot === "M" && s.last === "T");
           })
@@ -206,9 +213,10 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
     }
     for (const r of recs) {
       const s = st[r.id];
-      const code = taken.has(r.id) ? (schedule[r.id][d] as ShiftCode) : "D";
+      const off = offCode(r.id, d);
+      const code = off ?? (taken.has(r.id) ? (schedule[r.id][d] as ShiftCode) : "D");
       set(r.id, d, code);
-      if (code === "D") {
+      if (isOff(code)) {
         s.streak = 0;
         s.blockLen = 0;
         s.restRun++;
@@ -223,7 +231,7 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
           s.target = BLOCK_MIN + ((seed + di + recs.indexOf(r)) % (BLOCK_MAX - BLOCK_MIN + 1));
         }
       }
-      s.last = code;
+      s.last = isOff(code) ? "D" : code;
     }
     for (const s of seniors) {
       const code = schedule[s.id][d];
@@ -236,8 +244,9 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
   for (const s of staff) {
     const vals = dates.map((d) => schedule[s.id][d]);
     stats[s.id] = {
-      worked: vals.filter((v) => v !== "D").length,
+      worked: vals.filter((v) => !isOff(v)).length,
       rest: vals.filter((v) => v === "D").length,
+      off: vals.filter((v) => v === "V" || v === "B").length,
       M: vals.filter((v) => v === "M").length,
       T: vals.filter((v) => v === "T").length,
       N: vals.filter((v) => v === "N").length,

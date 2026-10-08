@@ -1,6 +1,6 @@
 import { monthDates } from "./dates";
 import { allowedShifts } from "./rules";
-import type { Schedule, Staff } from "./types";
+import { isOff, type Schedule, type Staff } from "./types";
 
 export interface Coverage {
   M: number;
@@ -47,7 +47,7 @@ export function validateSchedule(schedule: Schedule, staff: Staff[], year: numbe
   for (const s of staff) {
     let streak = 0;
     dates.forEach((d, i) => {
-      streak = !schedule[s.id]?.[d] || schedule[s.id][d] === "D" ? 0 : streak + 1;
+      streak = isOff(schedule[s.id]?.[d]) ? 0 : streak + 1;
       if (streak === MAX_CONSECUTIVE_DAYS + 1)
         issues.push({ kind: "streak", date: d, staffId: s.id, message: `${s.name}: más de ${MAX_CONSECUTIVE_DAYS} días seguidos trabajando (hasta el ${d})` });
       const code = schedule[s.id]?.[d];

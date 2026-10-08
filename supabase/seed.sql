@@ -5,7 +5,9 @@ insert into public.shifts (code, label, start_time, end_time, color) values
   ('S','Supervisión','09:15','17:15','#0f766e'),
   ('P','Partido','09:15','17:15','#7c3aed'),
   ('MZ','Mozo','11:00','19:00','#65a30d'),
-  ('D','Descanso',null,null,'#94a3b8')
+  ('D','Libre',null,null,'#92d050'),
+  ('V','Vacaciones',null,null,'#ff0000'),
+  ('B','Fuera de plantilla',null,null,'#000000')
 on conflict (code) do nothing;
 
 insert into public.staff (id, name, role, cycle_anchor, sort_order) values
@@ -17,7 +19,8 @@ insert into public.staff (id, name, role, cycle_anchor, sort_order) values
   ('alejandro','Alejandro','receptionist',null,6),
   ('marcos','Marcos','receptionist',null,7),
   ('alberto-m','Alberto M.','mozo','2026-01-01',8),
-  ('arturo','Arturo','mozo','2026-01-06',9)
+  ('arturo','Arturo','mozo','2026-01-06',9),
+  ('angela','Ángela','receptionist',null,10)
 on conflict (id) do nothing;
 
 -- After the manager signs in once, register her as editor:

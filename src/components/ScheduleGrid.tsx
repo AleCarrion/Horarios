@@ -13,7 +13,7 @@ interface Props {
   staff: Staff[];
   schedule: Schedule;
   validation: Validation;
-  onEdit: (staffId: string, date: string, code: ShiftCode) => void;
+  onEdit: (edits: { staffId: string; date: string; to: ShiftCode }[]) => void;
   readOnly?: boolean;
   title?: string;
 }
@@ -21,6 +21,7 @@ interface Props {
 export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, readOnly, title }: Props) {
   const dates = monthDates(year, month);
   const [menu, setMenu] = useState<{ staff: Staff; date: string; x: number; y: number } | null>(null);
+  const [days, setDays] = useState(1);
   const opener = useRef<HTMLElement | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -88,8 +89,9 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                       onClick={(e) => {
                         const r = e.currentTarget.getBoundingClientRect();
                         opener.current = e.currentTarget;
-                        const h = allowedShifts(s).length * 36 + 8;
+                        const h = allowedShifts(s).length * 36 + 56;
                         const y = r.bottom + h > window.innerHeight ? Math.max(4, r.top - h - 4) : r.bottom + 4;
+                        setDays(1);
                         setMenu({ staff: s, date: d, x: Math.min(r.left, window.innerWidth - 176), y });
                       }}
                       className={`flex h-8 w-10 items-center justify-center text-xs font-bold ${SHIFT_STYLE[code]} ${
@@ -143,7 +145,9 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                 role="option"
                 aria-selected={(schedule[menu.staff.id]?.[menu.date] ?? "D") === c}
                 onClick={() => {
-                  onEdit(menu.staff.id, menu.date, c);
+                  // Apply to `days` consecutive days from the clicked one (e.g. 14 days of vacation).
+                  const start = dates.indexOf(menu.date);
+                  onEdit(dates.slice(start, start + days).map((date) => ({ staffId: menu.staff.id, date, to: c })));
                   closeMenu();
                 }}
                 className="flex h-9 w-full items-center gap-2 rounded px-2 text-left text-sm hover:bg-brand/10 focus-visible:bg-brand/15 focus-visible:outline-2 focus-visible:outline-brand aria-selected:font-bold"
@@ -154,6 +158,19 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                 {SHIFTS[c].label}
               </button>
             ))}
+            <label className="flex items-center gap-2 border-t border-slate-200 px-2 pt-2 text-xs dark:border-slate-600">
+              Aplicar a
+              <input
+                type="number"
+                min={1}
+                max={dates.length - dates.indexOf(menu.date)}
+                value={days}
+                onChange={(e) => setDays(Math.max(1, Number(e.target.value) || 1))}
+                className="w-14 rounded border border-slate-300 bg-transparent px-1 py-0.5"
+                aria-label="Número de días a los que aplicar el turno"
+              />
+              días
+            </label>
           </div>
         </>
       )}
