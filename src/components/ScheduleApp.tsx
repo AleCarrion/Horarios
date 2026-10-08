@@ -7,7 +7,7 @@ import { DEFAULT_STAFF } from "@/lib/domain/roster";
 import type { Schedule } from "@/lib/domain/types";
 import { validateSchedule } from "@/lib/domain/validate";
 import { MONTHS, SHIFT_STYLE } from "@/lib/ui";
-import { SHIFTS } from "@/lib/domain/types";
+import { SHIFTS, displayCode } from "@/lib/domain/types";
 import { downloadText } from "@/lib/download";
 import { toCSV, toICS } from "@/lib/export";
 import { remoteConfigured } from "@/lib/supabase";
@@ -150,7 +150,7 @@ export function ScheduleApp() {
       <ul className="flex flex-wrap gap-2 text-xs" aria-label="Leyenda">
         {(["M", "T", "N", "S", "P", "MZ", "D"] as const).map((c) => (
           <li key={c} className={`rounded px-2 py-1 font-semibold ${SHIFT_STYLE[c]}`}>
-            {c} {SHIFTS[c].label} {SHIFTS[c].start && `${SHIFTS[c].start}-${SHIFTS[c].end}`}
+            {displayCode(c)} {SHIFTS[c].label} {SHIFTS[c].start && `${SHIFTS[c].start}-${SHIFTS[c].end}`}
           </li>
         ))}
       </ul>
@@ -162,6 +162,7 @@ export function ScheduleApp() {
       ) : (
       <ScheduleGrid
         readOnly={readOnly}
+        title={MONTHS[ym.month - 1]}
         year={ym.year}
         month={ym.month}
         staff={DEFAULT_STAFF}

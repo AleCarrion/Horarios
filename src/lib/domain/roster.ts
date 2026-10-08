@@ -3,8 +3,8 @@ import type { Staff } from "./types";
 export const DEFAULT_STAFF: Staff[] = [
   { id: "jc", name: "José Carlos", role: "night_auditor" },
   { id: "marta", name: "Marta", role: "director" },
-  { id: "ana", name: "Ana", role: "senior", extraShifts: ["M"], maxCovers: 5 },
-  { id: "julio", name: "Julio", role: "senior", extraShifts: ["M", "T"], maxCovers: 16 },
+  { id: "ana", name: "Ana", role: "senior", extraShifts: ["M"], maxCovers: 3 },
+  { id: "julio", name: "Julio", role: "senior", extraShifts: ["M", "T"], maxCovers: 12 },
   { id: "alberto-r", name: "Alberto R.", role: "receptionist" },
   { id: "alejandro", name: "Alejandro", role: "receptionist" },
   { id: "marcos", name: "Marcos", role: "receptionist" },

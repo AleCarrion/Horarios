@@ -21,8 +21,9 @@ describe("toCSV", () => {
     expect(rows[1].split(";")[0]).toBe("José Carlos");
   });
 
-  it("writes D as empty-looking descanso marker", () => {
-    expect(rows[1].split(";").slice(1, 32).every((c) => ["N", "D"].includes(c))).toBe(true);
+  it("uses the Excel letters: L for libre, P for the mozo shift", () => {
+    expect(rows[1].split(";").slice(1, 32).every((c) => ["N", "L"].includes(c))).toBe(true);
+    expect(rows[8].split(";").slice(1, 32).every((c) => ["P", "L"].includes(c))).toBe(true);
   });
 });
 

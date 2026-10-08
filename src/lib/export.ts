@@ -1,5 +1,5 @@
 import { monthDates, toISO } from "./domain/dates";
-import { SHIFTS, type Schedule, type ShiftCode, type Staff } from "./domain/types";
+import { SHIFTS, displayCode, type Schedule, type ShiftCode, type Staff } from "./domain/types";
 
 /** Semicolon-separated with BOM so Spanish-locale Excel opens it correctly. */
 export function toCSV(schedule: Schedule, staff: Staff[], year: number, month: number): string {
@@ -8,7 +8,7 @@ export function toCSV(schedule: Schedule, staff: Staff[], year: number, month: n
   const rows = staff.map((s) => {
     const codes = dates.map((d) => schedule[s.id]?.[d] ?? "D");
     const count = (c: ShiftCode) => codes.filter((x) => x === c).length;
-    return [s.name, ...codes, count("M"), count("T"), count("N"), count("D")];
+    return [s.name, ...codes.map(displayCode), count("M"), count("T"), count("N"), count("D")];
   });
   const esc = (v: string | number) => {
     const s = String(v);

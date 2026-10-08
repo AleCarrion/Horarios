@@ -28,7 +28,7 @@ export const SHIFTS: Record<ShiftCode, ShiftDef> = {
   S: { code: "S", label: "Supervisión", start: "09:15", end: "17:15" },
   P: { code: "P", label: "Partido", start: "09:15", end: "17:15" },
   MZ: { code: "MZ", label: "Mozo", start: "11:00", end: "19:00" },
-  D: { code: "D", label: "Descanso", start: "", end: "" },
+  D: { code: "D", label: "Libre", start: "", end: "" },
 };
 
 /** staffId -> (YYYY-MM-DD -> shift) */
@@ -50,6 +50,8 @@ export interface GeneratorConfig {
   prevDay?: Record<string, ShiftCode>;
   /** Extra senior rest days (YYYY-MM-DD) per staff id. */
   seniorRestDays?: Record<string, string[]>;
+  /** Planned rest days per senior in the month (default 10, as in the hotel's real rota). */
+  seniorRestCount?: number;
   seed?: number;
 }
 
@@ -66,3 +68,7 @@ export interface GeneratorResult {
   warnings: Warning[];
   stats: Record<string, { worked: number; rest: number; M: number; T: number; N: number }>;
 }
+
+/** Letter shown to users, matching the hotel's Excel: L for libre, P for the mozo shift. */
+export const DISPLAY_CODE: Record<ShiftCode, string> = { M: "M", T: "T", N: "N", S: "S", P: "P", MZ: "P", D: "L" };
+export const displayCode = (c: ShiftCode) => DISPLAY_CODE[c];

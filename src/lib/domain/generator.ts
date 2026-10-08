@@ -1,9 +1,8 @@
 import { diffDays, isWeekend, monthDates } from "./dates";
 import type { GeneratorConfig, GeneratorResult, Schedule, ShiftCode, Staff, Warning } from "./types";
 
-const MONDAY_ANCHOR = "2026-01-05";
 /** Extra "workload days" a covering senior counts as having, so receptionists are preferred but seniors still share M/T. */
-const SENIOR_PENALTY = 45;
+const SENIOR_PENALTY = 100;
 /** Receptionists rotate in blocks of the same shift (BLOCK_MIN..BLOCK_MAX days) with at least MIN_REST days off between blocks. */
 const BLOCK_MIN = 3;
 const BLOCK_MAX = 5;
@@ -22,9 +21,37 @@ export function autoJcRestDays(dates: string[], count: number): string[] {
   return [...picked].filter((i) => i < dates.length).map((i) => dates[i]);
 }
 
+/**
+ * Rest days for the partido/senior group: blocks of 2 days (a single day when the quota is odd) that
+ * alternate between seniors, with a work day or two in between, so at least one senior is always in
+ * and nobody works more than ~5 days in a row. Mirrors the hotel's real rota (10 rest days each).
+ */
+export function planSeniorRests(dates: string[], seniorIds: string[], quota: number, seed = 0): Record<string, Set<string>> {
+  const n = seniorIds.length;
+  const rests: Record<string, Set<string>> = Object.fromEntries(seniorIds.map((id) => [id, new Set<string>()]));
+  if (!n || quota <= 0) return rests;
+  const perSenior = Math.ceil(quota / 2);
+  const blocks = n * perSenior;
+  const slack = Math.max(0, dates.length - n * quota);
+  const gap = Math.floor(slack / (blocks + 1));
+  let extra = slack - gap * (blocks + 1);
+  const gaps = Array.from({ length: blocks + 1 }, (_, i) => gap + ((i + seed) % (blocks + 1) < extra ? 1 : 0));
+  extra = 0;
+  const remaining = Object.fromEntries(seniorIds.map((id) => [id, quota]));
+  let pos = gaps[0];
+  for (let k = 0; k < blocks; k++) {
+    const id = seniorIds[(k + seed) % n];
+    const len = Math.min(2, remaining[id]);
+    for (let j = 0; j < len && pos + j < dates.length; j++) rests[id].add(dates[pos + j]);
+    remaining[id] -= len;
+    pos += len + gaps[k + 1];
+  }
+  return rests;
+}
+
 export function generateSchedule(config: GeneratorConfig): GeneratorResult {
   const { year, month, staff } = config;
-  const maxStreak = config.maxStreak ?? 6;
+  const maxStreak = config.maxStreak ?? 5;
   const maxSeniorMornings = config.maxSeniorMornings ?? 6;
   const seed = config.seed ?? 0;
   const dates = monthDates(year, month);
@@ -49,17 +76,16 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
     }
   }
   const seniors = byRole("senior");
-  seniors.forEach((s, idx) => {
-    const extra = new Set(config.seniorRestDays?.[s.id] ?? []);
-    for (const d of dates) {
-      let works = true;
-      if (isWeekend(d)) {
-        const week = Math.floor(diffDays(d, MONDAY_ANCHOR) / 7);
-        works = ((week % seniors.length) + seniors.length) % seniors.length === idx;
-      }
-      set(s.id, d, works && !extra.has(d) ? "P" : "D");
-    }
-  });
+  const planned = planSeniorRests(
+    dates,
+    seniors.map((x) => x.id),
+    config.seniorRestCount ?? 10,
+    seed,
+  );
+  for (const sr of seniors) {
+    const extra = new Set(config.seniorRestDays?.[sr.id] ?? []);
+    for (const d of dates) set(sr.id, d, planned[sr.id].has(d) || extra.has(d) ? "D" : "P");
+  }
 
   // Receptionists: day-by-day greedy with hard rest rules and fairness scoring
   const recs = byRole("receptionist");
@@ -79,6 +105,7 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
       },
     ]),
   );
+  const maxNights = Math.max(1, Math.ceil(jcRest.size / Math.max(1, recs.length)));
   const seniorCovers: Record<string, number> = Object.fromEntries(seniors.map((s) => [s.id, 0]));
   const seniorLast: Record<string, ShiftCode> = Object.fromEntries(
     seniors.map((s) => [s.id, (config.prevDay?.[s.id] ?? "D") as ShiftCode]),
@@ -101,6 +128,7 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
       const eligible = recs.filter((r) => {
         const s = st[r.id];
         if (taken.has(r.id) || s.streak >= maxStreak) return false;
+        if (slot === "N" && s.N >= maxNights) return false; // share night cover: nobody gets stuck with 6
         if (s.last === "N" && slot !== "N") return false;
         if (slot === "M" && s.last === "T") return false;
         return true;
@@ -115,7 +143,7 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
         slot === "M" && !tBackup ? eligible.filter((r) => recs.some((o) => o !== r && canDoT(o))) : eligible;
       const score = (r: Staff, i: number) => {
         const s = st[r.id];
-        let v = s.worked * 10 + s.streak + s[slot] * 4 + ((i + seed + di) % recs.length) * 0.1;
+        let v = s.worked * 14 + s.streak + s[slot] * (slot === "N" ? 40 : 4) + ((i + seed + di) % recs.length) * 0.1;
         if (s.last === slot) v += s.blockLen < BLOCK_MIN ? -70 : s.blockLen < s.target ? -35 : 30; // finish a started block, then end it at its target
         else if (s.last !== "D") v += 25; // avoid switching shift without a rest day
         else if (s.restRun < MIN_REST) v += 30; // rest at least MIN_REST days between blocks

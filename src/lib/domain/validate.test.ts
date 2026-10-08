@@ -31,6 +31,14 @@ describe("validateSchedule", () => {
     expect(forbidden.map((i) => i.staffId)).toEqual(["ana"]);
   });
 
+  it("flags more than 6 consecutive working days", () => {
+    const { schedule } = base();
+    for (const d of ["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09", "2026-10-10", "2026-10-11", "2026-10-12"])
+      schedule.ana[d] = "P";
+    const v = validateSchedule(schedule, DEFAULT_STAFF, 2026, 10);
+    expect(v.issues.filter((i) => i.kind === "streak" && i.staffId === "ana")).toHaveLength(1);
+  });
+
   it("flags forbidden assignments (Marta night, senior night)", () => {
     const { schedule } = base();
     schedule.marta["2026-10-07"] = "N";

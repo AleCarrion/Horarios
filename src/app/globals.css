@@ -49,3 +49,7 @@ body {
   td > div { height: 18px !important; width: 100% !important; }
   select { display: none !important; }
 }
+
+@media print {
+  .schedule-table th, .schedule-table td { border: 1px solid #000 !important; }
+}

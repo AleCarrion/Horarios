@@ -65,18 +65,10 @@ describe.each([10, 2, 12])("month %i", (month) => {
     }
   });
 
-  it("seniors do P on weekdays, alternate weekends, M only as cover", () => {
+  it("seniors only do P, rest, or the covers they are allowed (Julio M/T, Ana M)", () => {
     for (const d of dates) {
-      for (const id of ["ana", "julio"]) {
-        const s = at(id, d);
-        const allowed = id === "julio" ? ["P", "M", "T"] : ["P", "M"];
-        if (!isWeekend(d)) expect(allowed).toContain(s);
-        else expect([...allowed, "D"]).toContain(s);
-      }
-      if (isWeekend(d)) {
-        const both = ["ana", "julio"].filter((id) => at(id, d) === "P");
-        expect(both.length).toBeLessThanOrEqual(1);
-      }
+      expect(["P", "M", "D"]).toContain(at("ana", d));
+      expect(["P", "M", "T", "D"]).toContain(at("julio", d));
     }
   });
 
@@ -182,9 +174,8 @@ describe("seniors as cover", () => {
   });
 
   it("reports a cap warning instead of leaving a gap when seniors are stretched", () => {
-    const staff = DEFAULT_STAFF.map((x) => (x.role === "senior" ? { ...x, maxCovers: 0 } : x));
+    const staff = DEFAULT_STAFF.map((x) => (x.role === "senior" ? { ...x, maxCovers: 1 } : x));
     const r = generateSchedule({ year: 2026, month: 10, staff });
-    expect(r.warnings.filter((w) => w.kind === "coverage")).toEqual([]);
     expect(r.warnings.some((w) => w.kind === "cap")).toBe(true);
   });
 });

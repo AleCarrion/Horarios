@@ -10,11 +10,14 @@ export interface Coverage {
 }
 
 export interface Issue {
-  kind: "coverage" | "forbidden" | "rest";
+  kind: "coverage" | "forbidden" | "rest" | "streak";
   date: string;
   staffId?: string;
   message: string;
 }
+
+/** Maximum consecutive working days before the schedule is flagged. */
+export const MAX_CONSECUTIVE_DAYS = 6;
 
 export interface Validation {
   coverage: Record<string, Coverage>;
@@ -42,7 +45,11 @@ export function validateSchedule(schedule: Schedule, staff: Staff[], year: numbe
   }
 
   for (const s of staff) {
+    let streak = 0;
     dates.forEach((d, i) => {
+      streak = !schedule[s.id]?.[d] || schedule[s.id][d] === "D" ? 0 : streak + 1;
+      if (streak === MAX_CONSECUTIVE_DAYS + 1)
+        issues.push({ kind: "streak", date: d, staffId: s.id, message: `${s.name}: más de ${MAX_CONSECUTIVE_DAYS} días seguidos trabajando (hasta el ${d})` });
       const code = schedule[s.id]?.[d];
       if (!code) return;
       if (!allowedShifts(s).includes(code))
