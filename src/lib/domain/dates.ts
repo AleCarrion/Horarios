@@ -25,3 +25,13 @@ export function weekday(iso: string): number {
 }
 
 export const isWeekend = (iso: string) => weekday(iso) === 0 || weekday(iso) === 6;
+
+/** Splits a month's dates into weeks that start on Monday (the first and last ones may be partial). */
+export function weeksOf(dates: string[]): string[][] {
+  const weeks: string[][] = [];
+  for (const d of dates) {
+    if (!weeks.length || weekday(d) === 1) weeks.push([]);
+    weeks[weeks.length - 1].push(d);
+  }
+  return weeks;
+}

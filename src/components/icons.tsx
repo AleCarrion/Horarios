@@ -88,3 +88,6 @@ export const InboxIcon = (p: SVGProps<SVGSVGElement>) => (
 export const CloseIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}><path d="M6 6l12 12M18 6 6 18" /></svg>
 );
+export const MoreIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base({ strokeWidth: 3, ...p })}><path d="M5 12h.01M12 12h.01M19 12h.01" /></svg>
+);

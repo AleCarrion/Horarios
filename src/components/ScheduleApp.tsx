@@ -4,6 +4,7 @@ import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { generateSchedule } from "@/lib/domain/generator";
 import { applyEdits, applyRemote, createHistory, redo, undo, type Edit } from "@/lib/domain/history";
 import { DEFAULT_STAFF } from "@/lib/domain/roster";
+import { monthDates, weeksOf } from "@/lib/domain/dates";
 import { moveStaff } from "@/lib/domain/team";
 import { applyTeamChange, planTeamChange, type MonthPlan } from "@/lib/teamPlanning";
 import { useTeam } from "@/lib/useTeam";
@@ -26,9 +27,11 @@ import { useAuth } from "@/lib/useAuth";
 import { useRemoteSchedule } from "@/lib/useRemoteSchedule";
 import { AuthBar } from "./AuthBar";
 import { ExportMenu } from "./ExportMenu";
-import { ChevronLeft, ChevronRight, CheckIcon, InboxIcon, LockIcon, LogoMark, RedoIcon, SparklesIcon, UndoIcon } from "./icons";
+import { ChevronLeft, ChevronRight, CheckIcon, DownloadIcon, InboxIcon, LockIcon, LogoMark, MoreIcon, PrinterIcon, TableIcon, RedoIcon, SparklesIcon, UndoIcon } from "./icons";
 import { RequestsPanel } from "./RequestsPanel";
+import { ActionSheet, type SheetAction } from "./ActionSheet";
 import { AppNav } from "./AppNav";
+import { MobileTabBar } from "./MobileTabBar";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { PlanDialog } from "./PlanDialog";
 import { ScheduleGrid } from "./ScheduleGrid";
@@ -78,9 +81,15 @@ export function ScheduleApp() {
   const [requests, setRequests] = useState<ShiftRequest[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  // On phones the month is shown a week at a time: 7 big columns instead of 31 tiny ones
+  const [view, setView] = useState<"week" | "month">("month");
+  const [weekIdx, setWeekIdx] = useState(0);
   useEffect(() => {
     // localStorage / the clock are only safe to read after mount
     setRequests(readRequests()); // eslint-disable-line react-hooks/set-state-in-effect
+    if (window.matchMedia("(max-width: 639px)").matches) setView("week");
+    if (new URLSearchParams(window.location.search).get("solicitudes")) setPanelOpen(true);
     const t = new Date();
     setToday(`${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`);
   }, []);
@@ -101,6 +110,18 @@ export function ScheduleApp() {
     onRemoteCell: (r) => dispatch({ type: "remote", staffId: r.staff_id, date: r.day, code: r.shift_code }),
   });
   const readOnly = remoteConfigured && !remote.canEdit;
+
+  const weeks = useMemo(() => weeksOf(monthDates(ym.year, ym.month)), [ym]);
+  useEffect(() => {
+    const i = today ? weeks.findIndex((w) => w.includes(today)) : -1;
+    setWeekIdx(i >= 0 ? i : 0); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [weeks, today]);
+  const swipe = useRef<number | null>(null);
+  const goWeek = (d: number) => setWeekIdx((i) => Math.min(weeks.length - 1, Math.max(0, i + d)));
+  const weekLabel = (() => {
+    const w = weeks[Math.min(weekIdx, weeks.length - 1)] ?? [];
+    return w.length ? `${Number(w[0].slice(8))}–${Number(w.at(-1)!.slice(8))} ${MONTHS[ym.month - 1].slice(0, 3).toLowerCase()}` : "";
+  })();
 
   // The previous month (streaks and rest runs carry over); planned in the background so the page never freezes.
   const [history, setHistory] = useState<Schedule | undefined>(undefined);
@@ -314,19 +335,53 @@ export function ScheduleApp() {
     writeLocks(ym.year, ym.month, {});
   };
 
+  const printMonth = () => {
+    setView("month"); // a printout always shows the whole month
+    setTimeout(() => window.print(), 150);
+  };
+
   const fileBase = `horario-${ym.year}-${String(ym.month).padStart(2, "0")}`;
   const exportCSV = () =>
     downloadText(`${fileBase}.csv`, toCSV(h.present, visible, ym.year, ym.month), "text/csv");
   const exportICS = (person: Staff) =>
     downloadText(`${fileBase}-${person.id}.ics`, toICS(h.present, person, ym.year, ym.month), "text/calendar");
 
+  const sheetActions: SheetAction[] = [
+    { label: "Deshacer", icon: <UndoIcon />, onClick: () => dispatch({ type: "undo" }), disabled: readOnly || !h.past.length },
+    { label: "Rehacer", icon: <RedoIcon />, onClick: () => dispatch({ type: "redo" }), disabled: readOnly || !h.future.length },
+    { label: "Exportar PDF / imprimir", hint: "Una página A4 apaisada con todo el mes", icon: <PrinterIcon />, onClick: printMonth },
+    { label: "Exportar CSV (Excel)", icon: <TableIcon />, onClick: exportCSV },
+    ...(remote.draft ? [{ label: "Publicar mes", icon: <DownloadIcon />, onClick: () => void remote.publish() }] : []),
+    { label: "Generar automático", hint: "Rehace el calendario del mes", icon: <SparklesIcon />, onClick: () => setConfirmRegenerate(true), disabled: readOnly, tone: "accent" as const },
+  ];
+
   const iconBtn =
     "glass grid h-10 w-10 place-items-center rounded-xl transition hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-95 disabled:pointer-events-none disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-brand";
 
   return (
     <>
-      <header className="glass top-0 z-30 border-x-0 border-t-0 sm:sticky print:hidden">
-        <div className="mx-auto flex w-full max-w-[1500px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+      <header className="glass sticky top-0 z-30 border-x-0 border-t-0 print:hidden">
+        {/* phones: one slim bar (logo, month, more) — the rest lives in the bottom tab bar and the action sheet */}
+        <div className="flex items-center gap-2 px-3 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))] sm:hidden">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-brand to-brand-2 shadow-md shadow-brand/30">
+            <LogoMark width={24} height={24} />
+          </span>
+          <div className="flex min-w-0 flex-1 items-center justify-between rounded-2xl border border-line bg-card-solid/70 p-0.5">
+            <button className="grid h-10 w-10 place-items-center rounded-xl active:bg-brand/10" onClick={() => shiftMonth(-1)} aria-label="Mes anterior">
+              <ChevronLeft />
+            </button>
+            <span key={`m-${ym.year}-${ym.month}`} className="anim-slide truncate text-base font-bold" aria-live="polite">
+              {MONTHS[ym.month - 1]} <span className="font-medium text-muted">{ym.year}</span>
+            </span>
+            <button className="grid h-10 w-10 place-items-center rounded-xl active:bg-brand/10" onClick={() => shiftMonth(1)} aria-label="Mes siguiente">
+              <ChevronRight />
+            </button>
+          </div>
+          <button className="glass grid h-11 w-11 shrink-0 place-items-center rounded-xl active:scale-95" onClick={() => setSheetOpen(true)} aria-label="Más acciones">
+            <MoreIcon />
+          </button>
+        </div>
+        <div className="mx-auto w-full max-w-[1500px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 max-sm:hidden sm:flex">
           <div className="flex items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 shadow-lg shadow-brand/30">
               <LogoMark />
@@ -371,7 +426,7 @@ export function ScheduleApp() {
                 </span>
               )}
             </button>
-            <ExportMenu onPdf={() => window.print()} onCsv={exportCSV} />
+            <ExportMenu onPdf={printMonth} onCsv={exportCSV} />
             {remote.draft && (
               <button
                 className="rounded-xl border border-brand/40 bg-brand/10 px-3.5 py-2 text-sm font-semibold text-brand transition hover:-translate-y-0.5 hover:bg-brand/20"
@@ -403,10 +458,10 @@ export function ScheduleApp() {
 
         <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 text-xs sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 print:hidden" aria-label="Leyenda">
           {(["M", "T", "N", "S", "P", "MZ", "D", "V"] as const).map((c) => (
-            <li key={c} className="glass flex shrink-0 items-center gap-2 rounded-full py-1 pl-1 pr-3 font-medium transition hover:-translate-y-0.5 hover:shadow-md">
+            <li key={c} className="glass flex shrink-0 items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2.5 text-xs font-medium sm:gap-2 sm:py-1 sm:pl-1 sm:pr-3 transition hover:-translate-y-0.5 hover:shadow-md">
               <span className={`grid h-6 w-7 place-items-center rounded-full text-[11px] font-bold ${SHIFT_STYLE[c]}`}>{displayCode(c)}</span>
               {SHIFTS[c].label}
-              {SHIFTS[c].start && <span className="text-muted">{SHIFTS[c].start}–{SHIFTS[c].end}</span>}
+              {SHIFTS[c].start && <span className="text-muted max-sm:hidden">{SHIFTS[c].start}–{SHIFTS[c].end}</span>}
             </li>
           ))}
         </ul>
@@ -419,15 +474,54 @@ export function ScheduleApp() {
           </p>
         )}
 
+        <div className="flex items-center gap-2 sm:hidden print:hidden">
+          <div role="group" aria-label="Vista del horario" className="flex rounded-2xl border border-line bg-card-solid/70 p-0.5 text-sm font-semibold">
+            {(["week", "month"] as const).map((v) => (
+              <button
+                key={v}
+                aria-pressed={view === v}
+                onClick={() => setView(v)}
+                className={`min-h-9 rounded-xl px-3.5 transition ${view === v ? "bg-brand text-white shadow" : "text-muted"}`}
+              >
+                {v === "week" ? "Semana" : "Mes"}
+              </button>
+            ))}
+          </div>
+          {view === "week" && (
+            <div className="ml-auto flex items-center gap-1 rounded-2xl border border-line bg-card-solid/70 p-0.5">
+              <button className="grid h-9 w-9 place-items-center rounded-xl active:bg-brand/10 disabled:opacity-30" onClick={() => goWeek(-1)} disabled={weekIdx === 0} aria-label="Semana anterior">
+                <ChevronLeft width={18} height={18} />
+              </button>
+              <span className="min-w-20 text-center text-sm font-bold" aria-live="polite">{weekLabel}</span>
+              <button className="grid h-9 w-9 place-items-center rounded-xl active:bg-brand/10 disabled:opacity-30" onClick={() => goWeek(1)} disabled={weekIdx >= weeks.length - 1} aria-label="Semana siguiente">
+                <ChevronRight width={18} height={18} />
+              </button>
+            </div>
+          )}
+        </div>
+
         {remote.unpublished ? (
           <p className="glass rounded-2xl p-6 text-center font-medium">Este mes todavía no está publicado.</p>
         ) : (
+          <div
+            onTouchStart={(e) => {
+              swipe.current = view === "week" && e.touches.length === 1 ? e.touches[0].clientX : null;
+            }}
+            onTouchEnd={(e) => {
+              if (swipe.current === null) return;
+              const dx = e.changedTouches[0].clientX - swipe.current;
+              swipe.current = null;
+              if (Math.abs(dx) > 70) goWeek(dx < 0 ? 1 : -1);
+            }}
+          >
           <ScheduleGrid
             key={`${ym.year}-${ym.month}`}
             readOnly={readOnly}
             today={today}
             year={ym.year}
             month={ym.month}
+            dates={view === "week" ? weeks[Math.min(weekIdx, weeks.length - 1)] : undefined}
+            compact={view === "week"}
             staff={visible}
             schedule={shown}
             validation={validation}
@@ -440,6 +534,7 @@ export function ScheduleApp() {
             onSwap={readOnly ? undefined : requestSwap}
             preview={previewCells}
           />
+          </div>
         )}
 
         <section aria-live="polite" className="glass rounded-2xl p-4 text-sm print:hidden">
@@ -463,6 +558,8 @@ export function ScheduleApp() {
         </section>
 
       </main>
+      <MobileTabBar pending={requests.filter((r) => r.status === "pending").length} onRequests={() => setPanelOpen(true)} />
+      <ActionSheet open={sheetOpen} onClose={() => setSheetOpen(false)} actions={sheetActions} />
       <RequestsPanel
         open={panelOpen}
         onClose={() => setPanelOpen(false)}

@@ -12,6 +12,8 @@ import { useTeam } from "@/lib/useTeam";
 import { useEffect } from "react";
 import { AuthBar } from "./AuthBar";
 import { AppNav } from "./AppNav";
+import { MobileTabBar } from "./MobileTabBar";
+import { readRequests } from "@/lib/requestsStore";
 import { ArrowDown, ArrowUp, GripIcon, LogoMark, PlusIcon, UsersIcon } from "./icons";
 import { PlanDialog } from "./PlanDialog";
 
@@ -47,7 +49,7 @@ const addDay = (iso: string, n: number) => {
 };
 
 const field =
-  "rounded-lg border border-line bg-card-solid/60 px-2 py-1.5 text-sm transition hover:border-brand/50 focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-40";
+  "min-w-0 rounded-lg border border-line bg-card-solid/60 px-2 py-1.5 text-sm transition hover:border-brand/50 focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-40";
 
 export function TeamPage() {
   const auth = useAuth();
@@ -55,8 +57,10 @@ export function TeamPage() {
   const readOnly = remoteConfigured && !auth.isEditor;
 
   const [today, setToday] = useState<string | null>(null);
+  const [pendingRequests, setPendingRequests] = useState(0);
   useEffect(() => {
     setToday(isoDay(new Date())); // eslint-disable-line react-hooks/set-state-in-effect
+    setPendingRequests(readRequests().filter((r) => r.status === "pending").length);
   }, []);
 
   const [proposal, setProposal] = useState<{ title: string; next: Staff[]; plans: MonthPlan[] } | null>(null);
@@ -153,11 +157,11 @@ export function TeamPage() {
         style={{ animationDelay: `${i * 35}ms` }}
       >
         <div className="flex flex-wrap items-center gap-3">
-          {!readOnly && <GripIcon width={16} height={16} className="cursor-grab text-muted opacity-40 transition group-hover:opacity-100 active:cursor-grabbing" aria-hidden="true" />}
+          {!readOnly && <GripIcon width={16} height={16} className="cursor-grab text-muted opacity-40 transition group-hover:opacity-100 active:cursor-grabbing [@media(hover:none)]:hidden" aria-hidden="true" />}
           <span aria-hidden="true" className={`grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-br text-sm font-bold text-white shadow ${ROLE_COLOR[p.role]}`}>
             {initials(p.name)}
           </span>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 basis-40">
             <input
               aria-label={`Nombre de ${p.name}`}
               defaultValue={p.name}
@@ -169,35 +173,37 @@ export function TeamPage() {
             <div className="mt-0.5 flex flex-wrap items-center gap-1.5 px-1.5">
               {leaving && <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:text-red-300">Baja el {p.activeTo!.slice(8)}/{p.activeTo!.slice(5, 7)}</span>}
               {starting && <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">Alta el {p.activeFrom!.slice(8)}/{p.activeFrom!.slice(5, 7)}</span>}
-              {!leaving && !starting && <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-semibold text-brand">En plantilla</span>}
+              {!leaving && !starting && <span className="whitespace-nowrap rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-semibold text-brand">En plantilla</span>}
             </div>
           </div>
-          <select
-            aria-label={`Puesto de ${p.name}`}
-            value={p.role}
-            disabled={readOnly}
-            onChange={(e) => propose(changeRole(staff, p.id, e.target.value as Role), `${p.name}: nuevo puesto`)}
-            className={field}
-          >
-            {SECTIONS.map((x) => (
-              <option key={x.role} value={x.role}>{x.label}</option>
-            ))}
-          </select>
-          <div className="flex items-center gap-1">
-            <button type="button" disabled={readOnly || i === 0} onClick={() => nudge(p.id, -1)} aria-label={`Subir a ${p.name}`} title="Subir" className="grid h-8 w-8 place-items-center rounded-lg text-muted transition hover:bg-brand/10 hover:text-brand disabled:pointer-events-none disabled:opacity-30">
-              <ArrowUp width={15} height={15} />
-            </button>
-            <button type="button" disabled={readOnly || i === list.length - 1} onClick={() => nudge(p.id, 1)} aria-label={`Bajar a ${p.name}`} title="Bajar" className="grid h-8 w-8 place-items-center rounded-lg text-muted transition hover:bg-brand/10 hover:text-brand disabled:pointer-events-none disabled:opacity-30">
-              <ArrowDown width={15} height={15} />
-            </button>
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <select
+              aria-label={`Puesto de ${p.name}`}
+              value={p.role}
+              disabled={readOnly}
+              onChange={(e) => propose(changeRole(staff, p.id, e.target.value as Role), `${p.name}: nuevo puesto`)}
+              className={`${field} max-sm:min-h-11 max-sm:flex-1`}
+            >
+              {SECTIONS.map((x) => (
+                <option key={x.role} value={x.role}>{x.label}</option>
+              ))}
+            </select>
+            <div className="flex items-center gap-1">
+              <button type="button" disabled={readOnly || i === 0} onClick={() => nudge(p.id, -1)} aria-label={`Subir a ${p.name}`} title="Subir" className="grid h-8 w-8 place-items-center rounded-lg text-muted transition hover:bg-brand/10 hover:text-brand disabled:pointer-events-none disabled:opacity-30">
+                <ArrowUp width={15} height={15} />
+              </button>
+              <button type="button" disabled={readOnly || i === list.length - 1} onClick={() => nudge(p.id, 1)} aria-label={`Bajar a ${p.name}`} title="Bajar" className="grid h-8 w-8 place-items-center rounded-lg text-muted transition hover:bg-brand/10 hover:text-brand disabled:pointer-events-none disabled:opacity-30">
+                <ArrowDown width={15} height={15} />
+              </button>
+            </div>
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-3 text-xs text-muted">
-          <label className="flex items-center gap-2">
+        <div className="mt-3 grid grid-cols-2 items-end gap-x-3 gap-y-2 border-t border-line pt-3 text-xs text-muted sm:flex sm:flex-wrap sm:items-center sm:gap-x-4">
+          <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
             Alta
             <input type="date" aria-label={`Alta de ${p.name}`} value={p.activeFrom ?? ""} disabled={readOnly} onChange={(e) => propose(updateStaff(staff, p.id, { activeFrom: e.target.value || undefined }), `${p.name}: alta`)} className={field} />
           </label>
-          <label className="flex items-center gap-2">
+          <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
             Baja
             <input type="date" aria-label={`Baja de ${p.name}`} value={p.activeTo ?? ""} disabled={readOnly} onChange={(e) => propose(updateStaff(staff, p.id, { activeTo: e.target.value || undefined }), `${p.name}: baja`)} className={field} />
           </label>
@@ -206,7 +212,7 @@ export function TeamPage() {
             disabled={readOnly || Boolean(p.activeTo)}
             onClick={() => propose(updateStaff(staff, p.id, { activeTo: addDay(editableStart(), -1) }), `${p.name}: baja`)}
             aria-label={`Dar de baja a ${p.name}`}
-            className="ml-auto rounded-lg px-3 py-1.5 font-semibold text-red-600 transition hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-30"
+            className="col-span-2 rounded-lg px-3 py-2.5 font-semibold text-red-600 transition hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-30 max-sm:border max-sm:border-red-500/30 sm:col-span-1 sm:ml-auto sm:py-1.5"
           >
             Dar de baja
           </button>
@@ -215,12 +221,27 @@ export function TeamPage() {
     );
   };
 
+
+  const rules = (
+    <ul className="mt-3 space-y-3">
+      {SECTIONS.map(({ role, label }) => (
+        <li key={role} className="flex gap-2.5 text-xs">
+          <span className={`mt-0.5 h-4 w-1.5 shrink-0 rounded-full ${ROLE_ACCENT[role]}`} aria-hidden="true" />
+          <span>
+            <b className="text-sm">{label}</b>
+            <span className="mt-0.5 block text-muted">{ROLE_RULES[role]}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+
   return (
     <>
-      <header className="glass top-0 z-30 border-x-0 border-t-0 sm:sticky">
+      <header className="glass sticky top-0 z-30 border-x-0 border-t-0 pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
           <div className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 shadow-lg shadow-brand/30">
+            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 shadow-lg shadow-brand/30 sm:h-11 sm:w-11">
               <LogoMark />
             </span>
             <div className="leading-tight">
@@ -228,7 +249,7 @@ export function TeamPage() {
               <p className="text-xs text-muted">Hotel Casa 1800</p>
             </div>
           </div>
-          <AppNav />
+          <div className="max-sm:hidden"><AppNav /></div>
         </div>
       </header>
 
@@ -237,33 +258,36 @@ export function TeamPage() {
 
         <div className="anim-fade-up flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Equipo</h2>
+            <h2 className="text-xl font-bold tracking-tight sm:text-2xl">Equipo</h2>
             <p className="mt-1 max-w-xl text-sm text-muted">
-              Quién trabaja en el hotel, en qué puesto y desde cuándo. Arrastra a una persona para reordenarla o cambiarla de puesto: el horario se reajusta alrededor y ves los cambios antes de aplicarlos.
+              Quién trabaja en el hotel, en qué puesto y desde cuándo.<span className="max-sm:hidden"> Arrastra a una persona para reordenarla o cambiarla de puesto: el horario se reajusta alrededor y ves los cambios antes de aplicarlos.</span><span className="sm:hidden"> Cambiar el puesto o las fechas reajusta el horario y ves los cambios antes de aplicarlos.</span>
             </p>
           </div>
-          <button
-            onClick={() => setAdding(true)}
-            disabled={readOnly}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-accent to-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-accent/30 transition hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:scale-95 disabled:pointer-events-none disabled:opacity-40"
-          >
-            <PlusIcon width={16} height={16} /> Añadir persona
-          </button>
+
         </div>
 
-        <section aria-label="Resumen del equipo" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <div className="glass anim-fade-up col-span-2 flex items-center gap-3 rounded-2xl p-3 sm:col-span-3 lg:col-span-1">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand/10 text-brand"><UsersIcon /></span>
+
+        <button
+          onClick={() => setAdding(true)}
+          disabled={readOnly}
+          className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-accent to-orange-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-accent/30 transition hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:scale-95 disabled:pointer-events-none disabled:opacity-40 max-sm:fixed max-sm:bottom-[calc(5rem+env(safe-area-inset-bottom))] max-sm:right-4 max-sm:z-30 max-sm:shadow-2xl sm:rounded-xl sm:py-2.5"
+        >
+          <PlusIcon width={16} height={16} /> Añadir persona
+        </button>
+
+        <section aria-label="Resumen del equipo" className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-6">
+          <div className="glass anim-fade-up flex items-center gap-3 rounded-2xl p-2.5 sm:p-3 lg:col-span-1">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand/10 text-brand max-sm:hidden"><UsersIcon /></span>
             <div>
               <div className="text-xs text-muted">En plantilla</div>
               <div className="text-xl font-bold">{onRoster.length}</div>
             </div>
           </div>
           {counts.map((c, i) => (
-            <div key={c.role} className="glass anim-fade-up flex items-center gap-3 rounded-2xl p-3" style={{ animationDelay: `${(i + 1) * 40}ms` }}>
-              <span className={`h-9 w-1.5 rounded-full ${ROLE_ACCENT[c.role]}`} aria-hidden="true" />
+            <div key={c.role} className="glass anim-fade-up flex items-center gap-2.5 rounded-2xl p-2.5 sm:gap-3 sm:p-3" style={{ animationDelay: `${(i + 1) * 40}ms` }}>
+              <span className={`h-8 w-1.5 shrink-0 rounded-full sm:h-9 ${ROLE_ACCENT[c.role]}`} aria-hidden="true" />
               <div>
-                <div className="text-xs text-muted">{c.label}</div>
+                <div className="text-[11px] text-muted sm:text-xs">{c.label}</div>
                 <div className="text-xl font-bold">{c.n}</div>
               </div>
             </div>
@@ -333,28 +357,18 @@ export function TeamPage() {
             )}
           </div>
 
-          <aside className="space-y-3 lg:sticky lg:top-24 lg:self-start" aria-label="Cómo trabaja cada puesto">
+          <aside className="space-y-3 max-lg:hidden lg:sticky lg:top-24 lg:self-start" aria-label="Cómo trabaja cada puesto">
             <div className="glass anim-fade-up rounded-3xl p-4">
               <h3 className="text-sm font-bold">Cómo trabaja cada puesto</h3>
               <p className="mt-1 text-xs text-muted">Son las reglas con las que se reajusta el horario cuando cambias el equipo.</p>
-              <ul className="mt-3 space-y-3">
-                {SECTIONS.map(({ role, label }) => (
-                  <li key={role} className="flex gap-2.5 text-xs">
-                    <span className={`mt-0.5 h-4 w-1.5 shrink-0 rounded-full ${ROLE_ACCENT[role]}`} aria-hidden="true" />
-                    <span>
-                      <b className="text-sm">{label}</b>
-                      <span className="mt-0.5 block text-muted">{ROLE_RULES[role]}</span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              {rules}
             </div>
           </aside>
         </div>
       </main>
 
       {adding && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm" onClick={() => setAdding(false)}>
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm max-sm:place-items-end max-sm:p-0" onClick={() => setAdding(false)}>
           <form
             role="dialog"
             aria-modal="true"
@@ -362,7 +376,7 @@ export function TeamPage() {
             onSubmit={submitNew}
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.key === "Escape" && setAdding(false)}
-            className="anim-menu w-full max-w-md space-y-4 rounded-3xl bg-card-solid p-6 shadow-2xl"
+            className="anim-menu w-full max-w-md space-y-4 rounded-3xl bg-card-solid p-6 shadow-2xl max-sm:max-w-none max-sm:rounded-b-none max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
           >
             <h2 id="add-title" className="text-lg font-bold">Añadir persona</h2>
             <label className="block text-sm">
@@ -400,6 +414,8 @@ export function TeamPage() {
           </form>
         </div>
       )}
+
+      <MobileTabBar pending={pendingRequests} />
 
       {proposal && (
         <PlanDialog

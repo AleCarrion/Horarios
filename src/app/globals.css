@@ -39,7 +39,9 @@
   --font-sans: var(--font-geist-sans);
 }
 
+html { -webkit-text-size-adjust: 100%; }
 body {
+  -webkit-tap-highlight-color: transparent;
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   background:
@@ -62,6 +64,10 @@ body {
   from { opacity: 0; transform: translateY(-6px) scale(0.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
 @keyframes slide-in {
   from { opacity: 0; transform: translateX(14px); }
   to { opacity: 1; transform: translateX(0); }
@@ -78,6 +84,7 @@ body {
 .anim-fade-up { animation: fade-up 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 .anim-pop { animation: pop 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.4); }
 .anim-menu { animation: menu-in 0.14s ease-out; transform-origin: top left; }
+.anim-sheet { animation: sheet-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .anim-slide { animation: slide-in 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 .anim-alert { animation: soft-pulse 1.8s ease-in-out infinite; }
 .anim-check path { stroke-dasharray: 24; animation: check-draw 0.5s 0.15s ease-out both; }
@@ -99,6 +106,12 @@ body {
 /* Drag & drop of people in the schedule */
 .schedule-table .drop-before { box-shadow: 0 -3px 0 0 var(--accent); }
 .schedule-table .drop-after { box-shadow: 0 3px 0 0 var(--accent); }
+
+/* Phones: 16px form controls stop iOS from zooming into them, and the bottom tab bar needs room */
+@media (max-width: 639px) {
+  input, select, textarea { font-size: 16px !important; }
+  body { padding-bottom: calc(4.25rem + env(safe-area-inset-bottom)); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

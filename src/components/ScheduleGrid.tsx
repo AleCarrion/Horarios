@@ -56,10 +56,15 @@ interface Props {
   preview?: Set<string>;
   readOnly?: boolean;
   today?: string | null;
+  /** Show only these days (a week on phones); `undefined` = the whole month. */
+  dates?: string[];
+  /** Bigger touch targets and a table that fills the width (week view on phones). */
+  compact?: boolean;
 }
 
-export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, onCalendar, onMove, onPlan, onSwap, locked, onLock, preview, readOnly, today }: Props) {
+export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, onCalendar, onMove, onPlan, onSwap, locked, onLock, preview, readOnly, today, dates: only, compact }: Props) {
   const dates = monthDates(year, month);
+  const cols = only ?? dates;
   const [menu, setMenu] = useState<{ staff: Staff; date: string; x: number; y: number } | null>(null);
   const [days, setDays] = useState(1);
   const [rebalance, setRebalance] = useState(true);
@@ -198,17 +203,17 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
       <div className="overflow-x-auto px-2 pb-2 pt-1">
         <table
           ref={tableRef}
-          className="schedule-table border-separate text-sm [border-spacing:3px]"
+          className={`schedule-table border-separate text-sm [border-spacing:3px] ${compact ? "w-full" : ""}`}
           onPointerOver={onHover}
           onPointerLeave={clearHover}
         >
           <caption className="sr-only">Horario mensual por persona y día</caption>
           <thead>
             <tr>
-              <th scope="col" className="sticky left-0 z-20 min-w-36 rounded-xl bg-card-solid p-2 text-left text-xs font-semibold uppercase tracking-wider text-muted">
+              <th scope="col" className={`sticky left-0 z-20 rounded-xl bg-card-solid p-2 text-left text-xs font-semibold uppercase tracking-wider text-muted ${compact ? "w-[7.5rem] min-w-0" : "min-w-36"}`}>
                 Equipo
               </th>
-              {dates.map((d) => {
+              {cols.map((d) => {
                 const isToday = today === d;
                 return (
                   <th
@@ -216,7 +221,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                     scope="col"
                     data-colhead={d}
                     title={isHoliday(d) ? "Festivo" : undefined}
-                    className={`min-w-9 rounded-xl px-0.5 py-1.5 text-center font-semibold transition-colors ${
+                    className={`${compact ? "min-w-0" : "min-w-9"} rounded-xl px-0.5 py-1.5 text-center font-semibold transition-colors ${
                       isToday
                         ? "bg-gradient-to-b from-brand to-brand-2 text-white shadow-md"
                         : isHoliday(d)
@@ -238,7 +243,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
               <Fragment key={role}>
                 <tr>
                   <th
-                    colSpan={dates.length + 1}
+                    colSpan={cols.length + 1}
                     scope="colgroup"
                     onDragOver={(e) => dropOnSection(e, role, false)}
                     onDragLeave={clearDrop}
@@ -272,7 +277,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                   className="sticky left-0 z-10 rounded-xl bg-card-solid p-1.5 pr-2 text-left font-medium transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    {onMove && (
+                    {onMove && !compact && (
                       <GripIcon
                         width={14}
                         height={14}
@@ -281,7 +286,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                     )}
                     <span
                       aria-hidden="true"
-                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br text-[11px] font-bold text-white shadow ${ROLE_COLOR[s.role]}`}
+                      className={`grid ${compact ? "h-7 w-7 text-[10px]" : "h-8 w-8 text-[11px]"} shrink-0 place-items-center rounded-full bg-gradient-to-br font-bold text-white shadow ${ROLE_COLOR[s.role]}`}
                     >
                       {initials(s.name)}
                     </span>
@@ -289,7 +294,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                       <span className="block truncate text-[13px] font-semibold">{s.name}</span>
                       <span className="hidden truncate text-[11px] text-muted sm:block">{ROLE_LABEL[s.role]}</span>
                     </span>
-                    {onCalendar && (
+                    {onCalendar && !compact && (
                       <button
                         type="button"
                         onClick={() => onCalendar(s)}
@@ -302,7 +307,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                     )}
                   </div>
                 </th>
-                {dates.map((d) => {
+                {cols.map((d) => {
                   const code = schedule[s.id]?.[d] ?? "D";
                   return (
                     <td key={d} className={`rounded-lg p-0 ${isWeekend(d) ? "bg-accent/[0.07]" : ""}`}>
@@ -315,7 +320,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                         aria-haspopup="listbox"
                         aria-label={`${cellLabel(s, d, code)}${locked?.[s.id]?.[d] ? ", bloqueada" : ""}`}
                         onClick={(e) => openMenu(e, s.id, d)}
-                        className={`relative flex h-9 w-9 items-center justify-center rounded-lg text-[13px] font-bold tracking-tight shadow-[inset_0_-2px_0_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.35)] transition-[transform,box-shadow] duration-150 enabled:cursor-pointer enabled:hover:z-10 enabled:hover:-translate-y-0.5 enabled:hover:scale-110 enabled:hover:shadow-lg enabled:active:scale-95 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+                        className={`relative flex ${compact ? "h-12 w-full min-w-0 text-base" : "h-9 w-9"} items-center justify-center rounded-lg text-[13px] font-bold tracking-tight shadow-[inset_0_-2px_0_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.35)] transition-[transform,box-shadow] duration-150 enabled:cursor-pointer enabled:hover:z-10 enabled:hover:-translate-y-0.5 enabled:hover:scale-110 enabled:hover:shadow-lg enabled:active:scale-95 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
                           code === "B" ? "bg-[repeating-linear-gradient(135deg,#0b0b0b_0_5px,#1f1f1f_5px_10px)]" : SHIFT_STYLE[code]
                         } ${bad.has(`${s.id}|${d}`) ? "anim-alert ring-2 ring-red-600" : ""} ${preview?.has(`${s.id}|${d}`) ? "ring-[3px] ring-accent ring-offset-1 ring-offset-card-solid" : ""}`}
                       >
@@ -336,7 +341,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                 <th scope="row" className="sticky left-0 z-10 rounded-xl bg-card-solid px-3 py-1.5 text-left text-xs font-semibold text-muted">
                   Cobertura {SHIFTS[k].label.toLowerCase()}
                 </th>
-                {dates.map((d) => {
+                {cols.map((d) => {
                   const ok = validation.coverage[d]?.[k] === 1;
                   return (
                     <td key={d} className="text-center">
@@ -373,7 +378,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
             aria-label={`Turno de ${menu.staff.name}, ${menu.date}`}
             onKeyDown={onMenuKey}
             style={{ left: menu.x, top: menu.y }}
-            className="anim-menu fixed z-30 w-56 rounded-2xl border border-line bg-card-solid p-1.5 shadow-2xl"
+            className="anim-menu fixed z-30 w-56 rounded-2xl border border-line bg-card-solid p-1.5 shadow-2xl max-sm:!inset-x-0 max-sm:!top-auto max-sm:!bottom-0 max-sm:!left-0 max-sm:max-h-[85vh] max-sm:w-full max-sm:overflow-y-auto max-sm:rounded-b-none max-sm:rounded-t-3xl max-sm:px-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] max-sm:animate-[sheet-up_0.22s_ease-out]"
           >
             <div className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-muted">
               {menu.staff.name} · {Number(menu.date.slice(8))}
@@ -394,7 +399,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                     else onEdit(range.map((date) => ({ staffId: menu.staff.id, date, to: c })));
                     closeMenu();
                   }}
-                  className="flex h-10 w-full items-center gap-2.5 rounded-xl px-2 text-left text-sm transition hover:bg-brand/10 focus-visible:bg-brand/15 focus-visible:outline-2 focus-visible:outline-brand aria-selected:bg-brand/10 aria-selected:font-bold"
+                  className="flex h-10 w-full items-center gap-2.5 rounded-xl px-2 text-left text-sm transition max-sm:h-12 hover:bg-brand/10 focus-visible:bg-brand/15 focus-visible:outline-2 focus-visible:outline-brand aria-selected:bg-brand/10 aria-selected:font-bold"
                 >
                   <span
                     className={`flex h-7 w-9 items-center justify-center rounded-lg text-xs font-bold shadow-[inset_0_-2px_0_rgba(0,0,0,0.14)] ${

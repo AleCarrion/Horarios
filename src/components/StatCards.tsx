@@ -13,7 +13,7 @@ function Ring({ pct }: { pct: number }) {
   const r = 22;
   const c = 2 * Math.PI * r;
   return (
-    <svg viewBox="0 0 56 56" className="h-11 w-11 shrink-0 sm:h-14 sm:w-14" role="img" aria-label={`${pct}% de cobertura`}>
+    <svg viewBox="0 0 56 56" className="h-9 w-9 shrink-0 sm:h-14 sm:w-14" role="img" aria-label={`${pct}% de cobertura`}>
       <circle cx="28" cy="28" r={r} fill="none" stroke="currentColor" strokeOpacity=".12" strokeWidth="6" />
       <circle
         cx="28"
@@ -41,18 +41,18 @@ function Ring({ pct }: { pct: number }) {
   );
 }
 
-function Card({ delay, icon, label, children, tone }: { delay: number; icon: ReactNode; label: string; children: ReactNode; tone?: string }) {
+function Card({ delay, icon, label, children, tone, className = "" }: { delay: number; icon: ReactNode; label: string; children: ReactNode; tone?: string; className?: string }) {
   return (
     <div
-      className="glass anim-fade-up group flex items-center gap-3 rounded-2xl p-3 transition sm:p-4 duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+      className={`glass anim-fade-up group flex flex-col items-start gap-1.5 rounded-2xl p-2.5 transition sm:flex-row sm:items-center sm:gap-3 sm:p-4 duration-200 hover:-translate-y-0.5 hover:shadow-lg ${className}`}
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl sm:h-11 sm:w-11 ${tone ?? "bg-brand/10 text-brand"} transition-transform group-hover:scale-110`}>
+      <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl max-sm:hidden sm:h-11 sm:w-11 ${tone ?? "bg-brand/10 text-brand"} transition-transform group-hover:scale-110`}>
         {icon}
       </div>
       <div className="min-w-0">
-        <div className="text-xs font-medium text-muted">{label}</div>
-        <div className="text-base font-bold leading-tight sm:text-xl">{children}</div>
+        <div className="text-[11px] font-medium text-muted sm:text-xs">{label}</div>
+        <div className="text-sm font-bold leading-tight sm:text-xl">{children}</div>
       </div>
     </div>
   );
@@ -60,12 +60,12 @@ function Card({ delay, icon, label, children, tone }: { delay: number; icon: Rea
 
 export function StatCards({ coveragePct, covered, total, issues, people }: Props) {
   return (
-    <section aria-label="Resumen del mes" className="grid grid-cols-2 gap-3 lg:grid-cols-4 print:hidden">
-      <div className="glass anim-fade-up flex items-center gap-3 rounded-2xl p-3 text-brand-2 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:gap-4 sm:p-4">
+    <section aria-label="Resumen del mes" className="grid grid-cols-3 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4 print:hidden">
+      <div className="glass anim-fade-up flex flex-col items-start gap-1.5 rounded-2xl p-2.5 text-brand-2 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:flex-row sm:items-center sm:gap-4 sm:p-4">
         <Ring pct={coveragePct} />
         <div>
-          <div className="text-xs font-medium text-muted">Cobertura del mes</div>
-          <div className="text-base font-bold leading-tight text-foreground sm:text-xl">{coveragePct === 100 ? "Completa" : "Con huecos"}</div>
+          <div className="text-[11px] font-medium text-muted sm:text-xs">Cobertura</div>
+          <div className="text-sm font-bold leading-tight text-foreground sm:text-xl">{coveragePct === 100 ? "Completa" : "Con huecos"}</div>
         </div>
       </div>
       <Card delay={60} icon={<ClockIcon />} label="Turnos cubiertos">
@@ -80,7 +80,7 @@ export function StatCards({ coveragePct, covered, total, issues, people }: Props
       >
         {issues === 0 ? "Todo en orden" : issues}
       </Card>
-      <Card delay={180} icon={<UsersIcon />} label="Personas este mes" tone="bg-accent/15 text-accent">
+      <Card delay={180} icon={<UsersIcon />} label="Personas este mes" tone="bg-accent/15 text-accent" className="max-sm:hidden">
         {people}
       </Card>
     </section>
