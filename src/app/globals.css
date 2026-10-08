@@ -143,3 +143,9 @@ body {
   .schedule-table .print-hide { display: none !important; }
   .anim-fade-up, .anim-slide, .anim-pop { animation: none !important; }
 }
+
+@keyframes flash-cell {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  25%, 75% { box-shadow: 0 0 0 4px rgb(239 68 68 / 0.75); }
+}
+.flash-cell { animation: flash-cell 1.6s ease-in-out; border-radius: 0.75rem; }

@@ -17,7 +17,7 @@ import { activeInMonth, isActive, type Role, type Schedule, type ShiftCode, type
 import { validateSchedule } from "@/lib/domain/validate";
 import { MONTHS, SHIFT_STYLE } from "@/lib/ui";
 import { SHIFTS, displayCode } from "@/lib/domain/types";
-import { planDayOff, planShiftSwap, type Plan, type RepairContext } from "@/lib/domain/repair";
+import { planDayOff, planFix, planShiftSwap, type Plan, type RepairContext } from "@/lib/domain/repair";
 import { decide, KIND_LABEL, planForRequest, requestMonth, type ShiftRequest } from "@/lib/domain/requests";
 import { readRequests, writeRequests } from "@/lib/requestsStore";
 import { downloadText } from "@/lib/download";
@@ -251,6 +251,24 @@ export function ScheduleApp() {
       plan: result,
       title: `Cambio de turno · ${pa?.name} ↔ ${pb?.name} · ${Number(date.slice(8))}${returnDate ? ` y ${Number(returnDate.slice(8))}` : ""} ${MONTHS[ym.month - 1].toLowerCase()}`,
     });
+  };
+  const fixIssues = () => {
+    const result = planFix({ year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: locks });
+    setPlan({ plan: result, title: `Arreglar avisos · ${MONTHS[ym.month - 1].toLowerCase()}` });
+  };
+  /** Jump to the day an issue is about: right week, scrolled into view, highlighted. */
+  const showIssue = (date: string, staffId?: string) => {
+    const w = weeks.findIndex((x) => x.includes(date));
+    if (w >= 0) setWeekIdx(w);
+    setTimeout(() => {
+      const sel = staffId ? `[data-row="${staffId}"][data-col="${date}"]` : `[data-colhead="${date}"]`;
+      const el = document.querySelector<HTMLElement>(sel);
+      if (!el) return;
+      el.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+      el.classList.remove("flash-cell");
+      void el.offsetWidth;
+      el.classList.add("flash-cell");
+    }, 80);
   };
   const applyPlan = () => {
     if (!plan) return;
@@ -544,15 +562,35 @@ export function ScheduleApp() {
             </p>
           ) : (
             <>
-              <p className="font-semibold text-red-600">{validation.issues.length} aviso(s)</p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-semibold text-red-600">{validation.issues.length} aviso(s)</p>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={fixIssues}
+                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white shadow transition hover:brightness-110 active:scale-95"
+                  >
+                    <SparklesIcon width={16} height={16} /> Arreglar avisos
+                  </button>
+                )}
+              </div>
               <ul className="mt-2 space-y-1">
                 {validation.issues.slice(0, 20).map((i, k) => (
-                  <li key={k} className="anim-fade-up flex items-start gap-2" style={{ animationDelay: `${k * 25}ms` }}>
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
-                    {i.message}
+                  <li key={k} className="anim-fade-up">
+                    <button
+                      type="button"
+                      onClick={() => showIssue(i.date, i.staffId)}
+                      className="flex w-full items-start gap-2 rounded-lg px-1 py-1 text-left transition hover:bg-red-500/10"
+                      style={{ animationDelay: `${k * 25}ms` }}
+                    >
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
+                      <span className="flex-1">{i.message}</span>
+                      <span className="shrink-0 text-xs font-semibold text-brand">Ver</span>
+                    </button>
                   </li>
                 ))}
               </ul>
+              {validation.issues.length > 20 && <p className="mt-1 text-xs text-muted">y {validation.issues.length - 20} más…</p>}
             </>
           )}
         </section>

@@ -327,6 +327,40 @@ export function planRestructure(ctx: RepairContext, newStaff: Staff[], from: str
   };
 }
 
+/**
+ * "Arreglar avisos": re-plan whatever is still editable so every rule is met again, changing as few cells as possible
+ * (locked cells and days that already happened stay as they are).
+ */
+export function planFix(ctx: RepairContext): Plan {
+  const found = validateSchedule(ctx.schedule, ctx.staff, ctx.year, ctx.month, ctx.history).issues;
+  if (!found.length) return { level: "green", strategy: "none", schedule: ctx.schedule, changes: [], issues: [], warnings: [], pins: [] };
+  const dates = monthDates(ctx.year, ctx.month);
+  const start = dates[0];
+  const pinned = freeze(ctx, ctx.staff, start, "9999-12-31");
+  // The re-plan tries to keep the old cells, but the ones that cause the warnings must be free to change:
+  // the whole day for a coverage hole, the person's surrounding days for a personal rule.
+  const loosened: Schedule = Object.fromEntries(Object.entries(ctx.schedule).map(([id, row]) => [id, { ...row }]));
+  for (const i of found) {
+    const at = dates.indexOf(i.date);
+    if (at < 0) continue;
+    const ids = i.staffId ? [i.staffId] : ctx.staff.map((s) => s.id);
+    const span = i.staffId ? dates.slice(Math.max(0, at - 3), at + 4) : [i.date];
+    for (const id of ids) for (const x of span) if (loosened[id] && !pinned[id]?.[x]) delete loosened[id][x];
+  }
+  const cand = replan({ ...ctx, schedule: loosened }, ctx.staff, pinned, null)!;
+  const lean = shrink(ctx, ctx.staff, cand.schedule, null, new Set());
+  return {
+    level: levelOf(cand.hard, cand.warnings),
+    strategy: "restructure",
+    schedule: lean,
+    changes: diff(ctx, lean),
+    issues: cand.hard,
+    warnings: cand.warnings,
+    pins: [],
+    reason: reasonFor(cand.hard),
+  };
+}
+
 /** Exchange the codes of two people on one day (a covers b's shift and b covers a's). */
 function exchange(schedule: Schedule, a: string, b: string, date: string): Schedule {
   const next: Schedule = { ...schedule };
