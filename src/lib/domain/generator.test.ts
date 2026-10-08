@@ -138,13 +138,13 @@ describe.each([10, 11, 2, 12])("block rotation, month %i", (month) => {
     }
   });
 
-  it("rests come in runs: no more than 3 isolated single rest days per receptionist", () => {
+  it("rests come in runs: no more than 5 isolated single rest days per receptionist", () => {
     for (const id of recepIds) {
       let single = 0;
       for (let i = 1; i < dates.length - 1; i++)
         if (schedule[id][dates[i]] === "D" && schedule[id][dates[i - 1]] !== "D" && schedule[id][dates[i + 1]] !== "D")
           single++;
-      expect(single).toBeLessThanOrEqual(3);
+      expect(single).toBeLessThanOrEqual(5); // a senior covering the second partido frees someone for a day
     }
   });
 

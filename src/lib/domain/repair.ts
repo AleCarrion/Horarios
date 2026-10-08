@@ -49,7 +49,7 @@ export interface Plan {
 
 const HARD: Issue["kind"][] = ["coverage", "forbidden", "rest", "streak", "restStreak"];
 const issueKey = (i: Issue) => `${i.kind}|${i.staffId ?? ""}|${i.date}|${i.message}`;
-const SEEDS = 8;
+const SEEDS = 16;
 /** From "keep the rotation pattern" to "change as few cells as possible". */
 const KEEP_LEVELS = [80, 250, 1000];
 const RADII = [3, 7, 14, Infinity];
@@ -194,7 +194,7 @@ function shrink(ctx: RepairContext, staff: Staff[], schedule: Schedule, known: S
   if (!ok(current)) return current; // only shrink valid plans
   for (let pass = 0; pass < 3; pass++) {
     let improved = false;
-    const changes = diff({ ...ctx, staff }, current).filter((c) => c.from && !fixed.has(`${c.staffId}|${c.date}`));
+    const changes = diff({ ...ctx, staff }, current).filter((c) => c.from && c.to !== "B" && c.from !== "B" && !fixed.has(`${c.staffId}|${c.date}`));
     const byDate = new Map<string, CellChange[]>();
     for (const c of changes) byDate.set(c.date, [...(byDate.get(c.date) ?? []), c]);
     for (const [, group] of byDate) {
@@ -260,16 +260,26 @@ export function planDayOff(ctx: RepairContext, staffId: string, from: string, ki
   return withNotice(ctx, planDayOffInner(ctx, staffId, from, kind, to), from);
 }
 
-function planDayOffInner(ctx: RepairContext, staffId: string, from: string, kind: "D" | "V", to: string): Plan {
+/** "Quiero mañanas esos días": the person asks to work a given shift (M, T or N) on a range of days. */
+export function planShiftPref(ctx: RepairContext, staffId: string, from: string, to: string, code: "M" | "T" | "N"): Plan {
+  return withNotice(ctx, planDayOffInner(ctx, staffId, from, code, to), from);
+}
+
+function planDayOffInner(ctx: RepairContext, staffId: string, from: string, kind: "D" | "V" | "M" | "T" | "N", to: string): Plan {
   const person = ctx.staff.find((s) => s.id === staffId);
   const days = monthDates(ctx.year, ctx.month).filter((x) => x >= from && x <= to);
   const none = (level: Level, reason?: string): Plan => ({ level, strategy: "none", schedule: ctx.schedule, changes: [], issues: [], warnings: [], pins: [], reason });
   if (!person || !days.length) return none("red", "Persona o fechas no válidas");
 
   const first = firstEditable(ctx);
-  const alreadyOff = days.every((x) => isOff(ctx.schedule[staffId]?.[x]) && (kind === "D" || ctx.schedule[staffId][x] === "V"));
+  const work = kind === "M" || kind === "T" || kind === "N";
+  if (work && !allowedShifts(person).includes(kind)) return none("red", `${person.name} no puede hacer el turno ${kind} (no entra en su puesto).`);
+  if (work && days.some((x) => !isActive(person, x))) return none("red", `${person.name} no está en plantilla alguno de esos días.`);
+  const alreadyOff = work
+    ? days.every((x) => ctx.schedule[staffId]?.[x] === kind)
+    : days.every((x) => isOff(ctx.schedule[staffId]?.[x]) && (kind === "D" || ctx.schedule[staffId][x] === "V"));
   if (alreadyOff) return none("green");
-  if (first && days.some((x) => x < first && !isOff(ctx.schedule[staffId]?.[x])))
+  if (first && days.some((x) => x < first && ctx.schedule[staffId]?.[x] !== kind))
     return none("red", `Esos días están protegidos (pasados o de los próximos ${ctx.protectedDays ?? 2} días); no se cambian solos.`);
   if (days.some((x) => ctx.locked?.[staffId]?.[x])) return none("red", "Alguno de esos días está bloqueado.");
 

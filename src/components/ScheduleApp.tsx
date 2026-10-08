@@ -17,7 +17,7 @@ import { activeInMonth, isActive, type Role, type Schedule, type ShiftCode, type
 import { validateSchedule } from "@/lib/domain/validate";
 import { MONTHS, SHIFT_STYLE } from "@/lib/ui";
 import { SHIFTS, displayCode } from "@/lib/domain/types";
-import { planDayOff, planFix, planShiftSwap, type Plan, type RepairContext } from "@/lib/domain/repair";
+import { planDayOff, planFix, planShiftPref, planShiftSwap, type Plan, type RepairContext } from "@/lib/domain/repair";
 import { decide, KIND_LABEL, planForRequest, requestMonth, type ShiftRequest } from "@/lib/domain/requests";
 import { readRequests, writeRequests } from "@/lib/requestsStore";
 import { downloadText } from "@/lib/download";
@@ -226,18 +226,13 @@ export function ScheduleApp() {
   };
 
   // --- day off / holidays requests: plan the whole month around them and show a preview first
-  const requestDays = (staffId: string, from: string, kind: "D" | "V", days: number) => {
+  const requestDays = (staffId: string, from: string, kind: "D" | "V" | "M" | "T" | "N", days: number) => {
     const person = staff.find((x) => x.id === staffId);
     const all = Object.keys(h.present[staffId] ?? {}).sort();
     const to = all[Math.min(all.indexOf(from) + days - 1, all.length - 1)] ?? from;
-    const result = planDayOff(
-      { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: locks },
-      staffId,
-      from,
-      kind,
-      to,
-    );
-    const label = kind === "V" ? "Vacaciones" : "Libre solicitado";
+    const ctx = { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: locks };
+    const result = kind === "M" || kind === "T" || kind === "N" ? planShiftPref(ctx, staffId, from, to, kind) : planDayOff(ctx, staffId, from, kind, to);
+    const label = kind === "V" ? "Vacaciones" : kind === "D" ? "Libre solicitado" : `Turno pedido (${{ M: "mañanas", T: "tardes", N: "noches" }[kind]})`;
     setPlan({
       plan: result,
       title: `${label} · ${person?.name} · ${Number(from.slice(8))}${to !== from ? `–${Number(to.slice(8))}` : ""} ${MONTHS[ym.month - 1].toLowerCase()}`,

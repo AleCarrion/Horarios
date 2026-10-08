@@ -74,7 +74,8 @@ describe("cambio de turno entre dos personas", () => {
   });
 
   it("refuses what the roles do not allow (night auditor cannot take a morning) and holiday days", () => {
-    const plan = planShiftSwap(ctx(), "jc", "marcos", d(5));
+    const day = dates.find((x) => base.jc[x] === "N" && !isOff(base.marcos[x]))!;
+    const plan = planShiftSwap(ctx(), "jc", "marcos", day);
     expect(plan.level).toBe("red");
     expect(plan.changes).toEqual([]);
     expect(plan.reason).toMatch(/permit|no puede|turno/i);

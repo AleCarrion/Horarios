@@ -1,8 +1,10 @@
 import { monthDates } from "./dates";
-import { planDayOff, planShiftSwap, type Plan, type RepairContext } from "./repair";
+import { planDayOff, planShiftPref, planShiftSwap, type Plan, type RepairContext } from "./repair";
 import type { Staff } from "./types";
 
-export type RequestKind = "libre" | "vacaciones" | "cambio";
+export type RequestKind = "libre" | "vacaciones" | "cambio" | "turno";
+/** Shifts a person can ask to work on a range of days ("turno" requests). */
+export type AskedShift = "M" | "T" | "N";
 export type RequestStatus = "pending" | "approved" | "rejected";
 
 export interface ShiftRequest {
@@ -14,8 +16,10 @@ export interface ShiftRequest {
   staffId: string;
   /** First day (and the only one for "libre" and "cambio"). */
   date: string;
-  /** Last day of a holiday range. */
+  /** Last day of a holiday / turno range. */
   endDate?: string;
+  /** "turno": the shift they ask to work on those days. */
+  shift?: AskedShift;
   /** "cambio": the other person, and an optional day when they exchange back. */
   withStaffId?: string;
   returnDate?: string;
@@ -31,6 +35,7 @@ export interface NewRequest {
   staffId: string;
   date: string;
   endDate?: string;
+  shift?: AskedShift;
   withStaffId?: string;
   returnDate?: string;
   note?: string;
@@ -41,7 +46,8 @@ const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? cry
 export function validateNew(r: Partial<NewRequest>, staff: Staff[]): string | null {
   if (!r.staffId || !staff.some((s) => s.id === r.staffId)) return "Elige una persona.";
   if (!r.date) return "Elige el día.";
-  if (r.kind === "vacaciones" && r.endDate && r.endDate < r.date) return "El último día no puede ser antes del primero.";
+  if (r.kind === "turno" && !r.shift) return "Elige el turno que quiere hacer.";
+  if ((r.kind === "vacaciones" || r.kind === "turno") && r.endDate && r.endDate < r.date) return "El último día no puede ser antes del primero.";
   if (r.kind === "cambio") {
     if (!r.withStaffId) return "Elige con quién cambia el turno.";
     if (r.withStaffId === r.staffId) return "Tienen que ser dos personas distintas.";
@@ -72,9 +78,9 @@ export function createRequests(input: NewRequest & { now?: string }): ShiftReque
   const createdAt = input.now ?? new Date().toISOString();
   const groupId = uid();
   const common = { groupId, kind: input.kind, staffId: input.staffId, note: input.note?.trim() || undefined, createdAt, status: "pending" as const };
-  if (input.kind === "vacaciones") {
+  if (input.kind === "vacaciones" || input.kind === "turno") {
     const to = input.endDate && input.endDate > input.date ? input.endDate : input.date;
-    return monthsBetween(input.date, to).map((p) => ({ ...common, id: uid(), date: p.date, endDate: p.endDate }));
+    return monthsBetween(input.date, to).map((p) => ({ ...common, id: uid(), date: p.date, endDate: p.endDate, ...(input.kind === "turno" ? { shift: input.shift } : {}) }));
   }
   return [
     {
@@ -114,8 +120,9 @@ export const requestMonth = (r: Pick<ShiftRequest, "date">) => ({ year: Number(r
 export function planForRequest(ctx: RepairContext, r: ShiftRequest): Plan {
   if (r.kind === "libre") return planDayOff(ctx, r.staffId, r.date, "D");
   if (r.kind === "vacaciones") return planDayOff(ctx, r.staffId, r.date, "V", r.endDate ?? r.date);
+  if (r.kind === "turno") return planShiftPref(ctx, r.staffId, r.date, r.endDate ?? r.date, r.shift ?? "M");
   return planShiftSwap(ctx, r.staffId, r.withStaffId ?? "", r.date, r.returnDate && r.returnDate.slice(0, 7) === r.date.slice(0, 7) ? r.returnDate : undefined);
 }
 
-export const KIND_LABEL: Record<RequestKind, string> = { libre: "Libre", vacaciones: "Vacaciones", cambio: "Cambio de turno" };
+export const KIND_LABEL: Record<RequestKind, string> = { libre: "Libre", vacaciones: "Vacaciones", cambio: "Cambio de turno", turno: "Turno pedido" };
 export const dayLabel = (iso: string) => `${Number(iso.slice(8))}/${Number(iso.slice(5, 7))}`;

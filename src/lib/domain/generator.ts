@@ -165,7 +165,7 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
   const planned = planSeniorRests(
     dates,
     seniors.map((x) => x.id),
-    config.seniorRestCount ?? 10,
+    config.seniorRestCount ?? Math.round(dates.length * 0.35),
     seed,
     Object.fromEntries(seniors.map((x) => [x.id, tail(x.id).streak])),
   );
@@ -202,12 +202,25 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
       (s) =>
         schedule[s.id][d] === "P" &&
         !pinnedWork(s.id, d) &&
+        !config.pinned?.[s.id]?.[d] && // a frozen partido is not touched
         s.extraShifts?.includes(slot) &&
         (ignoreCap || seniorCovers[s.id] < coverCap(s)) &&
         !(slot === "M" && seniorLast[s.id] === "T"),
     );
 
+  /** Looks at what is already fixed for the next days: a frozen morning tomorrow forbids a tarde/noche today, and a long frozen run needs a rest first. */
+  const blockedByPinned = (id: string, di: number, slot: ShiftCode, streak: number) => {
+    const next = di + 1 < dates.length ? pinnedWork(id, dates[di + 1]) : undefined;
+    if (next === "M" && (slot === "T" || slot === "N")) return true;
+    if (next && next !== "N" && slot === "N") return true;
+    let run = 0;
+    for (let k = di + 1; k < dates.length && pinnedWork(id, dates[k]); k++) run++;
+    return streak + 1 + run > LEGAL_STREAK;
+  };
+
   dates.forEach((d, di) => {
+    // only one person may be on "partido" a day: when both seniors would be, one of them covers M or T instead
+    const partidos = () => seniors.filter((x) => schedule[x.id][d] === "P").length;
     const slots: ("N" | "T" | "M")[] = jcRest.has(d) ? ["N", "M", "T"] : ["M", "T"];
     // a pinned shift on a day that would not normally need it still has to be planned (e.g. a pinned night)
     for (const x of [...recs, ...seniors]) {
@@ -228,6 +241,7 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
         const s = st[r.id];
         if (taken.has(r.id) || s.streak >= maxStreak || offCode(r.id, d)) return false;
         if (pinnedWork(r.id, d) && pinnedWork(r.id, d) !== slot) return false; // pinned to another slot
+        if (!pinnedWork(r.id, d) && blockedByPinned(r.id, di, slot, s.streak)) return false;
         if (slot === "N" && s.N >= maxNights) return false; // share night cover: nobody gets stuck with 6
         if (s.last === "N" && slot !== "N") return false;
         if (slot === "M" && s.last === "T") return false;
@@ -260,12 +274,16 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
         senior: false,
       }));
       if (slot !== "N")
-        for (const s of seniorsFor(slot, d).filter((x) => !taken.has(x.id)))
+        for (const s of (() => {
+          const within = seniorsFor(slot, d).filter((x) => !taken.has(x.id));
+          return within.length || partidos() < 2 ? within : seniorsFor(slot, d, true).filter((x) => !taken.has(x.id));
+        })())
           candidates.push({
             id: s.id,
             score:
               seniorCovers[s.id] * 10 +
               SENIOR_PENALTY +
+              (partidos() > 1 ? -400 : partidos() === 1 ? 120 : 0) + // two partidos: one must cover; the last partido stays
               (seniorLast[s.id] === slot ? (seniorBlock[s.id] < BLOCK_MAX - 1 ? -30 : 30) : 0) -
               (config.baseline?.[s.id]?.[d] === slot ? (config.baselineKeep ?? BASELINE_KEEP) : 0),
             senior: true,
@@ -279,6 +297,7 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
             const s = st[r.id];
             if (taken.has(r.id) || s.streak >= LEGAL_STREAK || offCode(r.id, d)) return false;
             if (pinnedWork(r.id, d) && pinnedWork(r.id, d) !== slot) return false; // pinned to another slot
+            if (!pinnedWork(r.id, d) && blockedByPinned(r.id, di, slot, s.streak)) return false;
             if (s.last === "N" && slot !== "N") return false;
             return !(slot === "M" && s.last === "T");
           })
@@ -301,6 +320,8 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
           warnings.push({ kind: "cap", date: d, shift: slot, message: `${over.name} supera su tope de coberturas el ${d}` });
         }
       }
+      if (pick?.senior && !holder && seniorCovers[pick.id] >= coverCap(seniors.find((x) => x.id === pick.id)!) && !warnings.some((w) => w.date === d && w.kind === "cap" && w.shift === slot))
+        warnings.push({ kind: "cap", date: d, shift: slot, message: `${seniors.find((x) => x.id === pick.id)!.name} supera su tope de coberturas el ${d}` });
       if (pick) {
         taken.add(pick.id);
         set(pick.id, d, slot);
@@ -308,6 +329,19 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
         continue;
       }
       warnings.push({ kind: "coverage", date: d, shift: slot, message: `Sin cobertura de ${slot} el ${d}` });
+    }
+    if (config.baseline && partidos() > 1) {
+      // repairing and nobody could cover: one senior rests that day instead (never a rest run longer than 3 days)
+      const runAround = (id: string) => {
+        let n = 1;
+        for (let k = di - 1; k >= 0 && schedule[id][dates[k]] === "D"; k--) n++;
+        for (let k = di + 1; k < dates.length && schedule[id][dates[k]] === "D"; k++) n++;
+        return n;
+      };
+      const rester = seniors
+        .filter((x) => schedule[x.id][d] === "P" && !pin(x.id, d) && runAround(x.id) <= MAX_REST_RUN)
+        .sort((a, b) => runAround(a.id) - runAround(b.id))[0];
+      if (rester) set(rester.id, d, "D");
     }
     for (const r of recs) {
       const s = st[r.id];

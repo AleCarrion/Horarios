@@ -1,4 +1,4 @@
-import type { RequestKind, RequestStatus, ShiftRequest } from "./domain/requests";
+import type { AskedShift, RequestKind, RequestStatus, ShiftRequest } from "./domain/requests";
 
 /** `public.requests` row (see supabase/migrations/0003_requests_locks.sql). */
 export interface RequestRow {
@@ -8,6 +8,7 @@ export interface RequestRow {
   staff_id: string;
   date: string;
   end_date: string | null;
+  shift: AskedShift | null;
   with_staff_id: string | null;
   return_date: string | null;
   note: string | null;
@@ -24,6 +25,7 @@ export const toRequestRow = (r: ShiftRequest): RequestRow => ({
   staff_id: r.staffId,
   date: r.date,
   end_date: r.endDate ?? null,
+  shift: r.shift ?? null,
   with_staff_id: r.withStaffId ?? null,
   return_date: r.returnDate ?? null,
   note: r.note ?? null,
@@ -45,6 +47,7 @@ export function fromRequestRows(rows: RequestRow[]): ShiftRequest[] {
       status: row.status,
     };
     if (row.end_date) r.endDate = row.end_date;
+    if (row.shift) r.shift = row.shift;
     if (row.with_staff_id) r.withStaffId = row.with_staff_id;
     if (row.return_date) r.returnDate = row.return_date;
     if (row.note) r.note = row.note;

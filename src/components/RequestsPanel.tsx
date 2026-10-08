@@ -71,7 +71,8 @@ export function RequestsPanel({ open, onClose, requests, staff, evaluate, onCrea
 
   const summary = (r: ShiftRequest) => {
     const days = r.endDate && r.endDate !== r.date ? `${dayLabel(r.date)}–${dayLabel(r.endDate)}` : dayLabel(r.date);
-    return r.kind === "cambio" ? `${name(r.staffId)} ↔ ${name(r.withStaffId)} · ${days}${r.returnDate ? ` (devuelve el ${dayLabel(r.returnDate)})` : ""}` : `${name(r.staffId)} · ${days}`;
+    const asked = r.kind === "turno" && r.shift ? ` · ${{ M: "mañanas", T: "tardes", N: "noches" }[r.shift]}` : "";
+    return r.kind === "cambio" ? `${name(r.staffId)} ↔ ${name(r.withStaffId)} · ${days}${r.returnDate ? ` (devuelve el ${dayLabel(r.returnDate)})` : ""}` : `${name(r.staffId)} · ${days}${asked}`;
   };
 
   const list = tab === "pending" ? pending : done;
@@ -134,13 +135,24 @@ export function RequestsPanel({ open, onClose, requests, staff, evaluate, onCrea
                 </select>
               </label>
               <label>
-                <span className="text-xs text-muted">{form.kind === "vacaciones" ? "Primer día" : "Día"}</span>
+                <span className="text-xs text-muted">{form.kind === "vacaciones" || form.kind === "turno" ? "Primer día" : "Día"}</span>
                 <input type="date" value={form.date ?? ""} onChange={(e) => setForm({ ...form, date: e.target.value })} className={inputCls} />
               </label>
-              {form.kind === "vacaciones" && (
+              {(form.kind === "vacaciones" || form.kind === "turno") && (
                 <label>
                   <span className="text-xs text-muted">Último día</span>
                   <input type="date" value={form.endDate ?? ""} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className={inputCls} />
+                </label>
+              )}
+              {form.kind === "turno" && (
+                <label>
+                  <span className="text-xs text-muted">Quiere hacer</span>
+                  <select value={form.shift ?? ""} onChange={(e) => setForm({ ...form, shift: (e.target.value || undefined) as NewRequest["shift"] })} className={inputCls}>
+                    <option value="">elegir…</option>
+                    <option value="M">Mañanas</option>
+                    <option value="T">Tardes</option>
+                    <option value="N">Noches</option>
+                  </select>
                 </label>
               )}
               {form.kind === "cambio" && (

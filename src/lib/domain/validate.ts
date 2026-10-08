@@ -39,6 +39,7 @@ export function validateSchedule(schedule: Schedule, staff: Staff[], year: numbe
       if (code === "M" || code === "T" || code === "N") c[code]++;
     }
     c.ok = c.M === 1 && c.T === 1 && c.N === 1;
+    if (staff.filter((s) => schedule[s.id]?.[d] === "P").length > 1) issues.push({ kind: "coverage", date: d, message: `Hay más de una persona de partido el ${d}` });
     coverage[d] = c;
     for (const k of ["M", "T", "N"] as const) {
       if (c[k] === 0) issues.push({ kind: "coverage", date: d, message: `Falta cobertura de ${k} el ${d}` });

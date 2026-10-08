@@ -89,3 +89,12 @@ describe("evaluating a request with the engine", () => {
     expect(requestMonth({ date: "2026-11-14" })).toEqual({ year: 2026, month: 11 });
   });
 });
+
+describe("turno pedido", () => {
+  it("needs a shift, and a range splits by month like holidays", () => {
+    expect(validateNew({ kind: "turno", staffId: DEFAULT_STAFF[3].id, date: "2026-11-10" }, DEFAULT_STAFF)).toMatch(/turno/i);
+    const rs = createRequests({ kind: "turno", staffId: DEFAULT_STAFF[3].id, date: "2026-11-29", endDate: "2026-12-02", shift: "M" });
+    expect(rs).toHaveLength(2);
+    expect(rs.every((r) => r.shift === "M" && r.kind === "turno")).toBe(true);
+  });
+});
