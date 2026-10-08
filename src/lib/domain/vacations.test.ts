@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { generateSchedule } from "./generator";
-import { DEFAULT_STAFF, EXTRA_RECEPTIONIST } from "./roster";
+import { DEFAULT_STAFF } from "./roster";
 import { monthDates, toISO } from "./dates";
-import type { GeneratorConfig, ShiftCode } from "./types";
+import type { GeneratorConfig, ShiftCode, Staff } from "./types";
 import { validateSchedule } from "./validate";
 
+/** A temporary 4th receptionist hired to cover holidays (not part of the default roster). */
+const EXTRA_RECEPTIONIST: Staff = { id: "temp", name: "Refuerzo", role: "receptionist" };
 const Y = 2026;
 const M = 9;
 const dates = monthDates(Y, M);

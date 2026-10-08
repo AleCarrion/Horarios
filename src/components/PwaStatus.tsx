@@ -21,7 +21,7 @@ export function PwaStatus() {
 
   if (online) return null;
   return (
-    <div role="status" className="bg-amber-200 px-4 py-2 text-center text-sm font-medium text-amber-950 print:hidden">
+    <div role="status" className="anim-fade-up bg-gradient-to-r from-amber-300 to-orange-300 px-4 py-2 text-center text-sm font-semibold text-amber-950 print:hidden">
       Sin conexión · Puedes seguir viendo y editando; los cambios se guardan en este dispositivo.
     </div>
   );

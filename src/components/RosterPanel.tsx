@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown } from "./icons";
 import type { Staff } from "@/lib/domain/types";
 import type { RosterOverrides } from "@/lib/rosterConfig";
 
@@ -12,11 +13,14 @@ interface Props {
 
 export function RosterPanel({ staff, overrides, disabled, onChange }: Props) {
   const input =
-    "rounded border border-brand/30 bg-transparent px-2 py-1 text-sm disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-brand";
+    "rounded-lg border border-line bg-card-solid/60 px-2 py-1 text-sm transition hover:border-brand/50 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-brand";
   return (
-    <details className="rounded-xl border border-slate-300/60 bg-white p-3 text-sm print:hidden dark:bg-slate-900">
-      <summary className="cursor-pointer font-semibold">Plantilla · fechas de alta y baja</summary>
-      <p className="mt-2 opacity-80">
+    <details className="glass group rounded-2xl p-4 text-sm print:hidden [&[open]>summary_svg]:rotate-180">
+      <summary className="flex cursor-pointer list-none items-center justify-between font-semibold transition hover:text-brand [&::-webkit-details-marker]:hidden">
+        <span>Plantilla · fechas de alta y baja</span>
+        <ChevronDown width={16} height={16} className="transition-transform" />
+      </summary>
+      <p className="mt-2 text-muted">
         Los días anteriores al alta y posteriores a la baja salen en negro (fuera de plantilla) y nadie los trabaja.
         Al cambiar una fecha se recalcula el mes alrededor de tus vacaciones y descansos marcados. Las fechas se guardan en este dispositivo.
       </p>

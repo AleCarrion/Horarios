@@ -1,0 +1,66 @@
+import type { SVGProps } from "react";
+
+const base = (p: SVGProps<SVGSVGElement>) => ({
+  width: 18,
+  height: 18,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+  ...p,
+});
+
+export const CalendarIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><rect x="3" y="4" width="18" height="17" rx="3" /><path d="M8 2v4M16 2v4M3 10h18" /></svg>
+);
+export const ChevronLeft = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="m15 18-6-6 6-6" /></svg>
+);
+export const ChevronRight = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="m9 18 6-6-6-6" /></svg>
+);
+export const ChevronDown = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="m6 9 6 6 6-6" /></svg>
+);
+export const UndoIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></svg>
+);
+export const RedoIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="m15 14 5-5-5-5" /><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" /></svg>
+);
+export const SparklesIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" /><path d="M19 15v4M17 17h4M5 3v3M3.5 4.5h3" /></svg>
+);
+export const DownloadIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M12 3v12m0 0 4-4m-4 4-4-4" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg>
+);
+export const CheckIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base({ strokeWidth: 3, ...p })} className={`anim-check ${p.className ?? ""}`}><path d="m5 12.5 4.5 4.5L19 7" /></svg>
+);
+export const AlertIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M12 3 2 20h20z" /><path d="M12 10v4M12 17.5v.01" /></svg>
+);
+export const UsersIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.2a6.5 6.5 0 0 1 3.5 5.8" /></svg>
+);
+export const ClockIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+);
+export const PrinterIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M6 9V3h12v6" /><rect x="3" y="9" width="18" height="9" rx="2" /><path d="M7 14h10v7H7z" /></svg>
+);
+export const TableIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 10h18M3 15h18M9 4v16" /></svg>
+);
+export const LogoMark = (p: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 32 32" width={32} height={32} aria-hidden="true" {...p}>
+    <rect x="5" y="7" width="22" height="20" rx="5" fill="#fff" fillOpacity=".95" />
+    <rect x="5" y="7" width="22" height="7" rx="3.5" fill="#fb923c" />
+    <rect x="9" y="17" width="4" height="3.5" rx="1" fill="#0b4f8a" /><rect x="14" y="17" width="4" height="3.5" rx="1" fill="#0b4f8a" />
+    <rect x="19" y="17" width="4" height="3.5" rx="1" fill="#0b4f8a" /><rect x="9" y="22" width="4" height="3.5" rx="1" fill="#0b4f8a" />
+    <rect x="14" y="22" width="4" height="3.5" rx="1" fill="#fb923c" />
+  </svg>
+);

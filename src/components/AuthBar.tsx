@@ -19,7 +19,7 @@ export function AuthBar({ auth, status }: { auth: AuthState; status: SyncStatus 
 
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm print:hidden">
-      <span className="rounded-full bg-brand/10 px-3 py-1 font-medium" role="status">
+      <span className="glass rounded-full px-3 py-1 font-medium" role="status">
         {LABEL[status]}
       </span>
       {status !== "local" &&
@@ -45,9 +45,9 @@ export function AuthBar({ auth, status }: { auth: AuthState; status: SyncStatus 
               value={mail}
               onChange={(e) => setMail(e.target.value)}
               placeholder="correo de la jefa"
-              className="rounded-lg border border-brand/30 bg-transparent px-2 py-1"
+              className="rounded-xl border border-line bg-card-solid/60 px-3 py-1.5"
             />
-            <button className="rounded-lg border border-brand/30 px-3 py-1 font-medium hover:bg-brand/10">Entrar</button>
+            <button className="rounded-xl bg-brand px-3 py-1.5 font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-md">Entrar</button>
             {msg && <span aria-live="polite">{msg}</span>}
           </form>
         ))}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateSchedule } from "./generator";
-import { DEFAULT_STAFF, EXTRA_RECEPTIONIST } from "./roster";
+import { DEFAULT_STAFF } from "./roster";
 import { monthDates, toISO } from "./dates";
 import { isActive } from "./types";
 import type { Staff } from "./types";
@@ -18,6 +18,7 @@ describe("isActive", () => {
 });
 
 describe("alta/baja dates generate B automatically (September 2026)", () => {
+  const EXTRA_RECEPTIONIST: Staff = { id: "temp", name: "Refuerzo", role: "receptionist" };
   const dates = monthDates(2026, 9);
   const staff: Staff[] = [
     ...DEFAULT_STAFF.map((s) => (s.role === "mozo" ? { ...s, activeFrom: "2026-09-07" } : s)),
@@ -36,8 +37,8 @@ describe("alta/baja dates generate B automatically (September 2026)", () => {
       expect(schedule["alberto-m"][d]).toBe("B");
       expect(schedule.arturo[d]).toBe("B");
     }
-    for (const d of range(21, 30)) expect(schedule.angela[d]).toBe("B");
-    expect(schedule.angela["2026-09-20"]).not.toBe("B");
+    for (const d of range(21, 30)) expect(schedule.temp[d]).toBe("B");
+    expect(schedule.temp["2026-09-20"]).not.toBe("B");
     expect(["MZ", "D"]).toContain(schedule.arturo["2026-09-07"]);
   });
 

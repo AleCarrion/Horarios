@@ -12,5 +12,3 @@ export const DEFAULT_STAFF: Staff[] = [
   { id: "arturo", name: "Arturo", role: "mozo", cycleAnchor: "2026-01-06" },
 ];
 
-/** Temporary 4th receptionist hired to cover holidays; added to the month on demand. */
-export const EXTRA_RECEPTIONIST: Staff = { id: "angela", name: "Ángela", role: "receptionist" };

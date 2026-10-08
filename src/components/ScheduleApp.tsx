@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useReducer, useState } from "react";
 import { generateSchedule } from "@/lib/domain/generator";
 import { applyEdits, applyRemote, createHistory, redo, undo, type Edit } from "@/lib/domain/history";
-import { DEFAULT_STAFF, EXTRA_RECEPTIONIST } from "@/lib/domain/roster";
+import { DEFAULT_STAFF } from "@/lib/domain/roster";
 import { buildStaff, readOverrides, writeOverrides, type RosterOverrides } from "@/lib/rosterConfig";
 import { diffSchedules } from "@/lib/sync";
 import { isActive, type Schedule, type ShiftCode, type Staff } from "@/lib/domain/types";
@@ -16,8 +16,11 @@ import { remoteConfigured } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
 import { useRemoteSchedule } from "@/lib/useRemoteSchedule";
 import { AuthBar } from "./AuthBar";
+import { ExportMenu } from "./ExportMenu";
+import { ChevronLeft, ChevronRight, CheckIcon, LogoMark, RedoIcon, SparklesIcon, UndoIcon } from "./icons";
 import { RosterPanel } from "./RosterPanel";
 import { ScheduleGrid } from "./ScheduleGrid";
+import { StatCards } from "./StatCards";
 
 type Action =
   | { type: "reset"; schedule: Schedule }
@@ -50,25 +53,25 @@ function load(y: number, m: number): Schedule {
     const raw = localStorage.getItem(storageKey(y, m));
     if (raw) return JSON.parse(raw) as Schedule;
   } catch {}
-  return generateSchedule({ year: y, month: m, staff: buildStaff(false, readOverrides()) }).schedule;
+  return generateSchedule({ year: y, month: m, staff: buildStaff(readOverrides()) }).schedule;
 }
 
 export function ScheduleApp() {
   const now = new Date();
   const [ym, setYm] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
-  const [icsPerson, setIcsPerson] = useState(DEFAULT_STAFF[0].id);
   const [h, dispatch] = useReducer(reducer, undefined, () =>
     createHistory(generateSchedule({ year: ym.year, month: ym.month, staff: DEFAULT_STAFF }).schedule),
   );
 
-  // The temporary receptionist is part of the month only when her row exists in the schedule.
-  const hasExtra = Boolean(h.present[EXTRA_RECEPTIONIST.id]);
   const [overrides, setOverrides] = useState<RosterOverrides>({});
+  const [today, setToday] = useState<string | null>(null);
   useEffect(() => {
-    // localStorage is only available after mount
+    // localStorage / the clock are only safe to read after mount
     setOverrides(readOverrides()); // eslint-disable-line react-hooks/set-state-in-effect
+    const t = new Date();
+    setToday(`${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`);
   }, []);
-  const staff = useMemo<Staff[]>(() => buildStaff(hasExtra, overrides), [hasExtra, overrides]);
+  const staff = useMemo<Staff[]>(() => buildStaff(overrides), [overrides]);
 
   const auth = useAuth();
   const remote = useRemoteSchedule({
@@ -95,15 +98,25 @@ export function ScheduleApp() {
     [h.present, ym, staff],
   );
 
+  const stats = useMemo(() => {
+    const days = Object.values(validation.coverage);
+    const total = days.length * 3;
+    const covered = days.reduce((n, c) => n + Math.min(c.M, 1) + Math.min(c.T, 1) + Math.min(c.N, 1), 0);
+    const first = `${ym.year}-${String(ym.month).padStart(2, "0")}-01`;
+    const last = `${ym.year}-${String(ym.month).padStart(2, "0")}-${String(days.length).padStart(2, "0")}`;
+    const people = staff.filter((p) => isActive(p, first) || isActive(p, last)).length;
+    return { total, covered, pct: total ? Math.round((covered / total) * 100) : 100, people };
+  }, [validation, staff, ym]);
+
   const shiftMonth = (delta: number) =>
     setYm(({ year, month }) => {
       const d = new Date(year, month - 1 + delta, 1);
       return { year: d.getFullYear(), month: d.getMonth() + 1 };
     });
 
-  const regenerate = (withExtra = hasExtra, ov: RosterOverrides = overrides) => {
+  const regenerate = (ov: RosterOverrides = overrides) => {
     try { localStorage.removeItem(storageKey(ym.year, ym.month)); } catch {}
-    const list = buildStaff(withExtra, ov);
+    const list = buildStaff(ov);
     // Holidays (V), days out of the roster (B) and JC's rest days are inputs: edit them in the grid, then regenerate around them.
     const unavailable: Record<string, Record<string, "V" | "B">> = {};
     for (const p of list) {
@@ -130,116 +143,130 @@ export function ScheduleApp() {
     const next = { ...overrides, [id]: { ...overrides[id], [field]: value || undefined } };
     setOverrides(next);
     writeOverrides(next);
-    regenerate(hasExtra, next);
+    regenerate(next);
   };
 
   const fileBase = `horario-${ym.year}-${String(ym.month).padStart(2, "0")}`;
   const exportCSV = () =>
     downloadText(`${fileBase}.csv`, toCSV(h.present, staff, ym.year, ym.month), "text/csv");
-  const exportICS = () => {
-    const person = staff.find((p) => p.id === icsPerson) ?? staff[0];
+  const exportICS = (person: Staff) =>
     downloadText(`${fileBase}-${person.id}.ics`, toICS(h.present, person, ym.year, ym.month), "text/calendar");
-  };
 
-  const btn =
-    "rounded-lg border border-brand/30 px-3 py-2 text-sm font-medium hover:bg-brand/10 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-brand";
+  const iconBtn =
+    "glass grid h-10 w-10 place-items-center rounded-xl transition hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-95 disabled:pointer-events-none disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-brand";
 
   return (
-    <main className="mx-auto w-full min-w-0 max-w-[1500px] space-y-4 p-4">
-      {remoteConfigured && <AuthBar auth={auth} status={remote.status} />}
-      <header className="flex flex-wrap items-center gap-3 print:hidden">
-        <h1 className="text-xl font-bold text-brand">Horarios · Casa 1800</h1>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <button className={btn} onClick={() => shiftMonth(-1)} aria-label="Mes anterior">‹</button>
-          <span className="min-w-36 text-center font-semibold" aria-live="polite">
-            {MONTHS[ym.month - 1]} {ym.year}
-          </span>
-          <button className={btn} onClick={() => shiftMonth(1)} aria-label="Mes siguiente">›</button>
-          <button className={btn} onClick={() => dispatch({ type: "undo" })} disabled={readOnly || !h.past.length}>Deshacer</button>
-          <button className={btn} onClick={() => dispatch({ type: "redo" })} disabled={readOnly || !h.future.length}>Rehacer</button>
-          {remote.draft && (
-            <button className={btn} onClick={() => void remote.publish()}>Publicar mes</button>
-          )}
-          <button
-            disabled={readOnly}
-            className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-brand"
-            onClick={() => regenerate()}
-          >
-            Generar automático
-          </button>
+    <>
+      <header className="glass top-0 z-30 border-x-0 border-t-0 sm:sticky print:hidden">
+        <div className="mx-auto flex w-full max-w-[1500px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 shadow-lg shadow-brand/30">
+              <LogoMark />
+            </span>
+            <div className="leading-tight">
+              <h1 className="text-lg font-bold tracking-tight">Horarios</h1>
+              <p className="text-xs text-muted">Hotel Casa 1800</p>
+            </div>
+          </div>
+
+          <div className="order-last mx-auto flex w-full items-center justify-between gap-1 rounded-2xl border border-line bg-card-solid/70 p-1 sm:order-none sm:w-auto">
+            <button className={`${iconBtn} !h-9 !w-9 border-0 shadow-none`} onClick={() => shiftMonth(-1)} aria-label="Mes anterior">
+              <ChevronLeft />
+            </button>
+            <span key={`${ym.year}-${ym.month}`} className="anim-slide min-w-36 text-center sm:min-w-44 text-base font-bold" aria-live="polite">
+              {MONTHS[ym.month - 1]} <span className="font-medium text-muted">{ym.year}</span>
+            </span>
+            <button className={`${iconBtn} !h-9 !w-9 border-0 shadow-none`} onClick={() => shiftMonth(1)} aria-label="Mes siguiente">
+              <ChevronRight />
+            </button>
+          </div>
+
+          <div className="ml-auto flex items-center gap-2 sm:ml-0">
+            <button className={iconBtn} onClick={() => dispatch({ type: "undo" })} disabled={readOnly || !h.past.length} aria-label="Deshacer" title="Deshacer">
+              <UndoIcon />
+            </button>
+            <button className={iconBtn} onClick={() => dispatch({ type: "redo" })} disabled={readOnly || !h.future.length} aria-label="Rehacer" title="Rehacer">
+              <RedoIcon />
+            </button>
+            <ExportMenu onPdf={() => window.print()} onCsv={exportCSV} />
+            {remote.draft && (
+              <button
+                className="rounded-xl border border-brand/40 bg-brand/10 px-3.5 py-2 text-sm font-semibold text-brand transition hover:-translate-y-0.5 hover:bg-brand/20"
+                onClick={() => void remote.publish()}
+              >
+                Publicar mes
+              </button>
+            )}
+            <button
+              disabled={readOnly}
+              onClick={() => regenerate()}
+              className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-accent to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-accent/30 transition hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:scale-95 disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            >
+              <SparklesIcon width={16} height={16} className="transition-transform group-hover:rotate-12 group-hover:scale-125" />
+              Generar<span className="hidden sm:inline"> automático</span>
+            </button>
+          </div>
         </div>
       </header>
 
-      <h2 className="hidden text-lg font-bold print:block">
-        Horario {MONTHS[ym.month - 1]} {ym.year} · Hotel Casa 1800
-      </h2>
+      <main className="mx-auto w-full min-w-0 max-w-[1500px] space-y-4 p-4">
+        {remoteConfigured && <AuthBar auth={auth} status={remote.status} />}
 
-      <div className="flex flex-wrap items-center gap-2 print:hidden" role="group" aria-label="Exportar">
-        <span className="text-sm font-medium">Exportar:</span>
-        <button className={btn} onClick={() => window.print()}>PDF / Imprimir</button>
-        <button className={btn} onClick={exportCSV}>CSV (Excel)</button>
-        <label className="sr-only" htmlFor="ics-person">Persona para iCal</label>
-        <select
-          id="ics-person"
-          value={icsPerson}
-          onChange={(e) => setIcsPerson(e.target.value)}
-          className="rounded-lg border border-brand/30 bg-transparent px-2 py-2 text-sm"
-        >
-          {staff.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-        <button className={btn} onClick={exportICS}>iCal (.ics)</button>
-      </div>
+        <StatCards coveragePct={stats.pct} covered={stats.covered} total={stats.total} issues={validation.issues.length} people={stats.people} />
 
-      <label className="flex items-center gap-2 text-sm print:hidden">
-        <input
-          type="checkbox"
-          checked={hasExtra}
-          disabled={readOnly}
-          onChange={(e) => regenerate(e.target.checked)}
-          className="h-4 w-4"
-        />
-        Recepcionista de refuerzo ({EXTRA_RECEPTIONIST.name}) para cubrir vacaciones
-      </label>
+        <h2 className="hidden text-lg font-bold print:block">
+          Horario {MONTHS[ym.month - 1]} {ym.year} · Hotel Casa 1800
+        </h2>
 
-      <RosterPanel staff={staff} overrides={overrides} disabled={readOnly} onChange={changeDates} />
+        <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 text-xs sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 print:hidden" aria-label="Leyenda">
+          {(["M", "T", "N", "S", "P", "MZ", "D", "V"] as const).map((c) => (
+            <li key={c} className="glass flex shrink-0 items-center gap-2 rounded-full py-1 pl-1 pr-3 font-medium transition hover:-translate-y-0.5 hover:shadow-md">
+              <span className={`grid h-6 w-7 place-items-center rounded-full text-[11px] font-bold ${SHIFT_STYLE[c]}`}>{displayCode(c)}</span>
+              {SHIFTS[c].label}
+              {SHIFTS[c].start && <span className="text-muted">{SHIFTS[c].start}–{SHIFTS[c].end}</span>}
+            </li>
+          ))}
+        </ul>
 
-      <ul className="flex flex-wrap gap-2 text-xs" aria-label="Leyenda">
-        {(["M", "T", "N", "S", "P", "MZ", "D", "V"] as const).map((c) => (
-          <li key={c} className={`rounded px-2 py-1 font-semibold ${SHIFT_STYLE[c]}`}>
-            {displayCode(c)} {SHIFTS[c].label} {SHIFTS[c].start && `${SHIFTS[c].start}-${SHIFTS[c].end}`}
-          </li>
-        ))}
-      </ul>
-
-      {remote.unpublished ? (
-        <p className="rounded-xl border border-slate-300/60 bg-white p-4 dark:bg-slate-900">
-          Este mes todavía no está publicado.
-        </p>
-      ) : (
-      <ScheduleGrid
-        readOnly={readOnly}
-        title={MONTHS[ym.month - 1]}
-        year={ym.year}
-        month={ym.month}
-        staff={staff}
-        schedule={h.present}
-        validation={validation}
-        onEdit={(edits) => dispatch({ type: "edit", edits })}
-      />
-      )}
-
-      <section aria-live="polite" className="print:hidden rounded-xl border border-slate-300/60 bg-white p-3 text-sm dark:bg-slate-900">
-        {validation.issues.length === 0 ? (
-          <p className="font-medium text-emerald-700">✓ Todas las reglas y coberturas se cumplen.</p>
+        {remote.unpublished ? (
+          <p className="glass rounded-2xl p-6 text-center font-medium">Este mes todavía no está publicado.</p>
         ) : (
-          <>
-            <p className="font-semibold text-red-700">{validation.issues.length} aviso(s)</p>
-            <ul className="mt-1 list-disc pl-5">
-              {validation.issues.slice(0, 20).map((i, k) => <li key={k}>{i.message}</li>)}
-            </ul>
-          </>
+          <ScheduleGrid
+            key={`${ym.year}-${ym.month}`}
+            readOnly={readOnly}
+            today={today}
+            year={ym.year}
+            month={ym.month}
+            staff={staff}
+            schedule={h.present}
+            validation={validation}
+            onEdit={(edits) => dispatch({ type: "edit", edits })}
+            onCalendar={exportICS}
+          />
         )}
-      </section>
-    </main>
+
+        <section aria-live="polite" className="glass rounded-2xl p-4 text-sm print:hidden">
+          {validation.issues.length === 0 ? (
+            <p className="flex items-center gap-2 font-semibold text-emerald-600 dark:text-emerald-400">
+              <CheckIcon width={18} height={18} /> Todas las reglas y coberturas se cumplen.
+            </p>
+          ) : (
+            <>
+              <p className="font-semibold text-red-600">{validation.issues.length} aviso(s)</p>
+              <ul className="mt-2 space-y-1">
+                {validation.issues.slice(0, 20).map((i, k) => (
+                  <li key={k} className="anim-fade-up flex items-start gap-2" style={{ animationDelay: `${k * 25}ms` }}>
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
+                    {i.message}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+
+        <RosterPanel staff={staff} overrides={overrides} disabled={readOnly} onChange={changeDates} />
+      </main>
+    </>
   );
 }

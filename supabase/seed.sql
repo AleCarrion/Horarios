@@ -19,8 +19,7 @@ insert into public.staff (id, name, role, cycle_anchor, sort_order) values
   ('alejandro','Alejandro','receptionist',null,6),
   ('marcos','Marcos','receptionist',null,7),
   ('alberto-m','Alberto M.','mozo','2026-01-01',8),
-  ('arturo','Arturo','mozo','2026-01-06',9),
-  ('angela','Ángela','receptionist',null,10)
+  ('arturo','Arturo','mozo','2026-01-06',9)
 on conflict (id) do nothing;
 
 -- After the manager signs in once, register her as editor:

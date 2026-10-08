@@ -1,11 +1,36 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { monthDates, weekday, isWeekend } from "@/lib/domain/dates";
+import { isWeekend, monthDates, weekday } from "@/lib/domain/dates";
 import { allowedShifts } from "@/lib/domain/rules";
 import { SHIFTS, displayCode, type Schedule, type ShiftCode, type Staff } from "@/lib/domain/types";
 import type { Validation } from "@/lib/domain/validate";
 import { SHIFT_STYLE, WEEKDAYS } from "@/lib/ui";
+import { CalendarIcon, CheckIcon } from "./icons";
+
+const WEEKDAY_NAMES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const ROLE_LABEL: Record<Staff["role"], string> = {
+  night_auditor: "Auditor nocturno",
+  director: "Dirección",
+  senior: "Apoyo",
+  receptionist: "Recepción",
+  mozo: "Mozo",
+};
+const ROLE_COLOR: Record<Staff["role"], string> = {
+  night_auditor: "from-indigo-500 to-blue-700",
+  director: "from-sky-500 to-blue-600",
+  senior: "from-violet-500 to-fuchsia-600",
+  receptionist: "from-amber-400 to-orange-600",
+  mozo: "from-cyan-400 to-teal-600",
+};
+const initials = (name: string) =>
+  name
+    .split(/[\s.]+/)
+    .filter(Boolean)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
 interface Props {
   year: number;
@@ -14,16 +39,37 @@ interface Props {
   schedule: Schedule;
   validation: Validation;
   onEdit: (edits: { staffId: string; date: string; to: ShiftCode }[]) => void;
+  onCalendar?: (staff: Staff) => void;
   readOnly?: boolean;
-  title?: string;
+  today?: string | null;
 }
 
-export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, readOnly, title }: Props) {
+export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, onCalendar, readOnly, today }: Props) {
   const dates = monthDates(year, month);
   const [menu, setMenu] = useState<{ staff: Staff; date: string; x: number; y: number } | null>(null);
   const [days, setDays] = useState(1);
   const opener = useRef<HTMLElement | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
+  const tipRef = useRef<HTMLDivElement>(null);
+  const tipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const live = useRef({ schedule, staff });
+  const prevSchedule = useRef(schedule);
+  useEffect(() => {
+    live.current = { schedule, staff };
+    // Pop the cells that just changed (imperative: no per-cell state, keeps hydration cheap).
+    const before = prevSchedule.current;
+    prevSchedule.current = schedule;
+    if (before === schedule || !tableRef.current) return;
+    for (const id of Object.keys(schedule))
+      for (const [d, c] of Object.entries(schedule[id]))
+        if (before[id]?.[d] && before[id][d] !== c) {
+          const el = tableRef.current.querySelector<HTMLElement>(`[data-row="${id}"][data-col="${d}"]`);
+          if (!el) continue;
+          el.classList.add("anim-pop");
+          el.addEventListener("animationend", () => el.classList.remove("anim-pop"), { once: true });
+        }
+  }, [schedule, staff]);
 
   const closeMenu = () => {
     setMenu(null);
@@ -47,86 +93,180 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
     e.preventDefault();
   };
 
+  // Crosshair highlight + tooltip, done imperatively so hovering never re-renders 300 cells.
+  const clearHover = () => {
+    tableRef.current?.querySelectorAll(".hl-row,.hl-col").forEach((el) => el.classList.remove("hl-row", "hl-col"));
+    if (tipTimer.current) clearTimeout(tipTimer.current);
+    if (tipRef.current) tipRef.current.style.opacity = "0";
+  };
+  const onHover = (e: React.PointerEvent) => {
+    const cell = (e.target as HTMLElement).closest<HTMLElement>("[data-cell]");
+    if (!cell || !tableRef.current) return clearHover();
+    const { row, col } = cell.dataset as { row: string; col: string };
+    tableRef.current.querySelectorAll(".hl-row,.hl-col").forEach((el) => el.classList.remove("hl-row", "hl-col"));
+    tableRef.current.querySelector(`[data-rowhead="${row}"]`)?.classList.add("hl-row");
+    tableRef.current.querySelector(`[data-colhead="${col}"]`)?.classList.add("hl-col");
+    if (tipTimer.current) clearTimeout(tipTimer.current);
+    if (tipRef.current) tipRef.current.style.opacity = "0";
+    tipTimer.current = setTimeout(() => {
+      const tip = tipRef.current;
+      if (!tip) return;
+      const { schedule: sch, staff: st } = live.current;
+      const person = st.find((x) => x.id === row);
+      const code = sch[row]?.[col] ?? "D";
+      const def = SHIFTS[code];
+      const [y, m, d] = col.split("-").map(Number);
+      const dayName = WEEKDAY_NAMES[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+      tip.textContent = `${person?.name} · ${dayName} ${d} · ${def.label}${def.start ? ` ${def.start}–${def.end}` : ""}`;
+      const r = cell.getBoundingClientRect();
+      tip.style.left = `${Math.min(Math.max(8, r.left + r.width / 2 - tip.offsetWidth / 2), window.innerWidth - tip.offsetWidth - 8)}px`;
+      tip.style.top = `${Math.max(8, r.top - 40)}px`;
+      tip.style.opacity = "1";
+    }, 220);
+  };
+
+  const openMenu = (e: React.MouseEvent<HTMLButtonElement>, staffId: string, date: string) => {
+    const person = staff.find((x) => x.id === staffId)!;
+    const r = e.currentTarget.getBoundingClientRect();
+    opener.current = e.currentTarget;
+    clearHover();
+    const h = allowedShifts(person).length * 40 + 64;
+    const y = r.bottom + h > window.innerHeight ? Math.max(4, r.top - h - 4) : r.bottom + 6;
+    setDays(1);
+    setMenu({ staff: person, date, x: Math.min(r.left, window.innerWidth - 232), y });
+  };
+
   const bad = new Set(validation.issues.filter((i) => i.staffId).map((i) => `${i.staffId}|${i.date}`));
+  const cellLabel = (s: Staff, d: string, code: ShiftCode) => `${s.name}, ${d}, ${SHIFTS[code].label} ${displayCode(code)}`;
 
   return (
-    <div className="overflow-x-auto rounded-md border border-black/40 bg-white shadow-sm">
-      <table className="schedule-table border-collapse text-sm">
-        <caption className="sr-only">Horario mensual por persona y día</caption>
-        <thead>
-          <tr>
-            <th scope="col" className="sticky left-0 z-10 min-w-32 border border-black/40 bg-[#ffff00] p-2 text-center font-bold uppercase text-black">
-              {title ?? "Persona"}
-            </th>
-            {dates.map((d) => (
-              <th
-                key={d}
-                scope="col"
-                className={`min-w-11 border border-black/40 p-1 text-center font-bold text-black ${isWeekend(d) ? "bg-[#a6a6a6]" : "bg-white"}`}
-              >
-                <div className="text-[11px]">{WEEKDAYS[weekday(d)]}</div>
-                <div>{Number(d.slice(8))}</div>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {staff.map((s) => (
-            <tr key={s.id}>
-              <th scope="row" className="sticky left-0 z-10 border border-black/40 bg-white p-2 text-left font-bold uppercase text-black">
-                {s.name}
+    <div className="glass anim-fade-up overflow-hidden rounded-2xl shadow-[0_18px_50px_-20px_rgba(11,79,138,0.35)]" style={{ animationDelay: "120ms" }}>
+      <div className="overflow-x-auto px-2 pb-2 pt-1">
+        <table
+          ref={tableRef}
+          className="schedule-table border-separate text-sm [border-spacing:3px]"
+          onPointerOver={onHover}
+          onPointerLeave={clearHover}
+        >
+          <caption className="sr-only">Horario mensual por persona y día</caption>
+          <thead>
+            <tr>
+              <th scope="col" className="sticky left-0 z-20 min-w-36 rounded-xl bg-card-solid p-2 text-left text-xs font-semibold uppercase tracking-wider text-muted">
+                Equipo
               </th>
               {dates.map((d) => {
-                const code = schedule[s.id]?.[d] ?? "D";
-                const invalid = bad.has(`${s.id}|${d}`);
+                const isToday = today === d;
                 return (
-                  <td key={d} className="border border-black/40 p-0">
-                    <button
-                      type="button"
-                      disabled={readOnly}
-                      aria-haspopup="listbox"
-                      aria-label={`${s.name}, ${d}, ${SHIFTS[code].label} ${displayCode(code)}`}
-                      onClick={(e) => {
-                        const r = e.currentTarget.getBoundingClientRect();
-                        opener.current = e.currentTarget;
-                        const h = allowedShifts(s).length * 36 + 56;
-                        const y = r.bottom + h > window.innerHeight ? Math.max(4, r.top - h - 4) : r.bottom + 4;
-                        setDays(1);
-                        setMenu({ staff: s, date: d, x: Math.min(r.left, window.innerWidth - 176), y });
-                      }}
-                      className={`flex h-8 w-10 items-center justify-center text-xs font-bold ${SHIFT_STYLE[code]} ${
-                        invalid ? "outline-2 -outline-offset-2 outline-red-600 ring-2 ring-inset ring-red-600" : ""
-                      } enabled:cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand`}
-                    >
-                      {displayCode(code)}
-                    </button>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          {(["M", "T", "N"] as const).map((k) => (
-            <tr key={k}>
-              <th scope="row" className="sticky left-0 z-10 border border-black/40 bg-white p-2 text-left text-xs font-bold text-black">
-                Cobertura {SHIFTS[k].label}
-              </th>
-              {dates.map((d) => {
-                const ok = validation.coverage[d]?.[k] === 1;
-                return (
-                  <td
+                  <th
                     key={d}
-                    className={`border border-black/40 p-1 text-center text-xs font-bold ${ok ? "bg-white text-emerald-800" : "bg-red-100 text-red-800"}`}
+                    scope="col"
+                    data-colhead={d}
+                    className={`min-w-9 rounded-xl px-0.5 py-1.5 text-center font-semibold transition-colors ${
+                      isToday
+                        ? "bg-gradient-to-b from-brand to-brand-2 text-white shadow-md"
+                        : isWeekend(d)
+                          ? "bg-accent/15 text-accent"
+                          : "bg-card-solid text-foreground"
+                    }`}
                   >
-                    <span aria-label={ok ? "cubierto" : "sin cubrir"}>{ok ? "✓" : "✗"}</span>
-                  </td>
+                    <div className="text-[10px] font-medium uppercase opacity-80">{WEEKDAYS[weekday(d)]}</div>
+                    <div className="text-sm leading-tight">{Number(d.slice(8))}</div>
+                  </th>
                 );
               })}
             </tr>
-          ))}
-        </tfoot>
-      </table>
+          </thead>
+          <tbody>
+            {staff.map((s) => (
+              <tr key={s.id} className="group">
+                <th
+                  scope="row"
+                  data-rowhead={s.id}
+                  className="sticky left-0 z-10 rounded-xl bg-card-solid p-1.5 pr-2 text-left font-medium transition-colors"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      aria-hidden="true"
+                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br text-[11px] font-bold text-white shadow ${ROLE_COLOR[s.role]}`}
+                    >
+                      {initials(s.name)}
+                    </span>
+                    <span className="min-w-0 flex-1 leading-tight">
+                      <span className="block truncate text-[13px] font-semibold">{s.name}</span>
+                      <span className="hidden truncate text-[11px] text-muted sm:block">{ROLE_LABEL[s.role]}</span>
+                    </span>
+                    {onCalendar && (
+                      <button
+                        type="button"
+                        onClick={() => onCalendar(s)}
+                        aria-label={`Descargar calendario de ${s.name} (.ics)`}
+                        title="Descargar calendario (.ics)"
+                        className="print-hide rounded-lg p-1.5 text-muted opacity-0 transition hover:bg-brand/10 hover:text-brand focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+                      >
+                        <CalendarIcon width={15} height={15} />
+                      </button>
+                    )}
+                  </div>
+                </th>
+                {dates.map((d) => {
+                  const code = schedule[s.id]?.[d] ?? "D";
+                  return (
+                    <td key={d} className={`rounded-lg p-0 ${isWeekend(d) ? "bg-accent/[0.07]" : ""}`}>
+                      <button
+                        type="button"
+                        data-cell
+                        data-row={s.id}
+                        data-col={d}
+                        disabled={readOnly}
+                        aria-haspopup="listbox"
+                        aria-label={cellLabel(s, d, code)}
+                        onClick={(e) => openMenu(e, s.id, d)}
+                        className={`relative flex h-9 w-9 items-center justify-center rounded-lg text-[13px] font-bold tracking-tight shadow-[inset_0_-2px_0_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.35)] transition-[transform,box-shadow] duration-150 enabled:cursor-pointer enabled:hover:z-10 enabled:hover:-translate-y-0.5 enabled:hover:scale-110 enabled:hover:shadow-lg enabled:active:scale-95 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+                          code === "B" ? "bg-[repeating-linear-gradient(135deg,#0b0b0b_0_5px,#1f1f1f_5px_10px)]" : SHIFT_STYLE[code]
+                        } ${bad.has(`${s.id}|${d}`) ? "anim-alert ring-2 ring-red-600" : ""}`}
+                      >
+                        {displayCode(code)}
+                      </button>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            {(["M", "T", "N"] as const).map((k) => (
+              <tr key={k}>
+                <th scope="row" className="sticky left-0 z-10 rounded-xl bg-card-solid px-3 py-1.5 text-left text-xs font-semibold text-muted">
+                  Cobertura {SHIFTS[k].label.toLowerCase()}
+                </th>
+                {dates.map((d) => {
+                  const ok = validation.coverage[d]?.[k] === 1;
+                  return (
+                    <td key={d} className="text-center">
+                      <span
+                        role="img"
+                        aria-label={ok ? "cubierto" : "sin cubrir"}
+                        className={`mx-auto grid h-5 w-5 place-items-center rounded-full text-[11px] font-bold transition-colors ${
+                          ok ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "anim-alert bg-red-600 text-white"
+                        }`}
+                      >
+                        {ok ? <CheckIcon width={12} height={12} /> : "!"}
+                      </span>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tfoot>
+        </table>
+      </div>
+
+      <div
+        ref={tipRef}
+        aria-hidden="true"
+        className="pointer-events-none fixed z-40 rounded-lg bg-slate-900/95 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-xl transition-opacity duration-150 print:hidden"
+      />
+
       {menu && (
         <>
           <div className="fixed inset-0 z-20" onClick={closeMenu} aria-hidden="true" />
@@ -136,29 +276,43 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
             aria-label={`Turno de ${menu.staff.name}, ${menu.date}`}
             onKeyDown={onMenuKey}
             style={{ left: menu.x, top: menu.y }}
-            className="fixed z-30 w-44 rounded-lg border border-slate-300 bg-white p-1 shadow-lg dark:bg-slate-800"
+            className="anim-menu fixed z-30 w-56 rounded-2xl border border-line bg-card-solid p-1.5 shadow-2xl"
           >
-            {allowedShifts(menu.staff).map((c) => (
-              <button
-                key={c}
-                type="button"
-                role="option"
-                aria-selected={(schedule[menu.staff.id]?.[menu.date] ?? "D") === c}
-                onClick={() => {
-                  // Apply to `days` consecutive days from the clicked one (e.g. 14 days of vacation).
-                  const start = dates.indexOf(menu.date);
-                  onEdit(dates.slice(start, start + days).map((date) => ({ staffId: menu.staff.id, date, to: c })));
-                  closeMenu();
-                }}
-                className="flex h-9 w-full items-center gap-2 rounded px-2 text-left text-sm hover:bg-brand/10 focus-visible:bg-brand/15 focus-visible:outline-2 focus-visible:outline-brand aria-selected:font-bold"
-              >
-                <span className={`flex h-6 w-8 items-center justify-center rounded text-xs font-semibold ${SHIFT_STYLE[c]}`}>
-                  {displayCode(c)}
-                </span>
-                {SHIFTS[c].label}
-              </button>
-            ))}
-            <label className="flex items-center gap-2 border-t border-slate-200 px-2 pt-2 text-xs dark:border-slate-600">
+            <div className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-muted">
+              {menu.staff.name} · {Number(menu.date.slice(8))}
+            </div>
+            {allowedShifts(menu.staff).map((c) => {
+              const selected = (schedule[menu.staff.id]?.[menu.date] ?? "D") === c;
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  onClick={() => {
+                    // Apply to `days` consecutive days from the clicked one (e.g. 14 days of vacation).
+                    const start = dates.indexOf(menu.date);
+                    onEdit(dates.slice(start, start + days).map((date) => ({ staffId: menu.staff.id, date, to: c })));
+                    closeMenu();
+                  }}
+                  className="flex h-10 w-full items-center gap-2.5 rounded-xl px-2 text-left text-sm transition hover:bg-brand/10 focus-visible:bg-brand/15 focus-visible:outline-2 focus-visible:outline-brand aria-selected:bg-brand/10 aria-selected:font-bold"
+                >
+                  <span
+                    className={`flex h-7 w-9 items-center justify-center rounded-lg text-xs font-bold shadow-[inset_0_-2px_0_rgba(0,0,0,0.14)] ${
+                      c === "B" ? "bg-black" : SHIFT_STYLE[c]
+                    }`}
+                  >
+                    {displayCode(c)}
+                  </span>
+                  <span className="flex-1 leading-tight">
+                    {SHIFTS[c].label}
+                    {SHIFTS[c].start && <span className="block text-[11px] font-normal text-muted">{SHIFTS[c].start}–{SHIFTS[c].end}</span>}
+                  </span>
+                  {selected && <CheckIcon width={14} height={14} className="text-brand" />}
+                </button>
+              );
+            })}
+            <label className="mt-1 flex items-center gap-2 border-t border-line px-2 pt-2 text-xs text-muted">
               Aplicar a
               <input
                 type="number"
@@ -166,7 +320,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                 max={dates.length - dates.indexOf(menu.date)}
                 value={days}
                 onChange={(e) => setDays(Math.max(1, Number(e.target.value) || 1))}
-                className="w-14 rounded border border-slate-300 bg-transparent px-1 py-0.5"
+                className="w-14 rounded-lg border border-line bg-transparent px-1.5 py-1 text-foreground"
                 aria-label="Número de días a los que aplicar el turno"
               />
               días
