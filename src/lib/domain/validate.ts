@@ -10,7 +10,7 @@ export interface Coverage {
 }
 
 export interface Issue {
-  kind: "coverage" | "forbidden" | "rest" | "streak";
+  kind: "coverage" | "forbidden" | "rest" | "streak" | "restStreak";
   date: string;
   staffId?: string;
   message: string;
@@ -18,6 +18,8 @@ export interface Issue {
 
 /** Maximum consecutive working days before the schedule is flagged. */
 export const MAX_CONSECUTIVE_DAYS = 6;
+/** Maximum consecutive libre days (D) for everyone except mozos. Vacations (V) and out-of-roster days (B) are not counted. */
+export const MAX_REST_RUN = 3;
 
 export interface Validation {
   coverage: Record<string, Coverage>;
@@ -46,7 +48,11 @@ export function validateSchedule(schedule: Schedule, staff: Staff[], year: numbe
 
   for (const s of staff) {
     let streak = 0;
+    let restRun = 0;
     dates.forEach((d, i) => {
+      restRun = schedule[s.id]?.[d] === "D" ? restRun + 1 : 0;
+      if (s.role !== "mozo" && restRun === MAX_REST_RUN + 1)
+        issues.push({ kind: "restStreak", date: d, staffId: s.id, message: `${s.name}: más de ${MAX_REST_RUN} días libres seguidos (hasta el ${d})` });
       streak = isOff(schedule[s.id]?.[d]) ? 0 : streak + 1;
       if (streak === MAX_CONSECUTIVE_DAYS + 1)
         issues.push({ kind: "streak", date: d, staffId: s.id, message: `${s.name}: más de ${MAX_CONSECUTIVE_DAYS} días seguidos trabajando (hasta el ${d})` });

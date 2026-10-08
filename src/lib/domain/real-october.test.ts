@@ -33,11 +33,24 @@ const maxStreak = (row: Record<string, ShiftCode>, ds: string[]) => {
   }
   return max;
 };
+/** Longest run of libre (D) days; holidays (V) and out-of-roster days (B) break the run. */
+const maxRestRun = (row: Record<string, ShiftCode>, ds: string[]) => {
+  let cur = 0;
+  let max = 0;
+  for (const d of ds) {
+    cur = row[d] === "D" ? cur + 1 : 0;
+    max = Math.max(max, cur);
+  }
+  return max;
+};
 const count = (row: Record<string, ShiftCode>, ds: string[], c: ShiftCode) => ds.filter((d) => row[d] === c).length;
 
 describe("real October 2026 schedule (calibration)", () => {
-  it("has full coverage and breaks none of our rules", () => {
-    expect(validateSchedule(real, DEFAULT_STAFF, 2026, 10).issues).toEqual([]);
+  it("has full coverage and breaks none of our rules (JC's 4-day rest was a course)", () => {
+    const issues = validateSchedule(real, DEFAULT_STAFF, 2026, 10).issues.filter(
+      (i) => !(i.kind === "restStreak" && i.staffId === "jc"),
+    );
+    expect(issues).toEqual([]);
   });
 
   it("everyone rests 10-11 days (mozos excluded) and the two seniors never rest the same day", () => {
@@ -51,6 +64,11 @@ describe("real October 2026 schedule (calibration)", () => {
 
   it("nobody works more than 6 days in a row", () => {
     for (const id of Object.keys(real)) expect(maxStreak(real[id], dates)).toBeLessThanOrEqual(6);
+  });
+
+  it("nobody but mozos (and JC that month, who had a course) rests more than 3 days in a row", () => {
+    for (const id of Object.keys(real).filter((x) => !["alberto-m", "arturo", "jc"].includes(x)))
+      expect(maxRestRun(real[id], dates)).toBeLessThanOrEqual(3);
   });
 });
 
@@ -67,6 +85,11 @@ describe.each([1, 2, 4, 6, 9, 10, 11, 12])("generator vs real figures, month %i"
       expect(maxStreak(s[id], ds)).toBeLessThanOrEqual(6);
     }
     expect(ds.filter((d) => s.ana[d] === "D" && s.julio[d] === "D")).toEqual([]);
+  });
+
+  it("nobody but mozos rests more than 3 days in a row", () => {
+    for (const id of Object.keys(s).filter((x) => !["alberto-m", "arturo"].includes(x)))
+      expect(maxRestRun(s[id], ds)).toBeLessThanOrEqual(3);
   });
 
   it("nobody exceeds 6 consecutive working days", () => {

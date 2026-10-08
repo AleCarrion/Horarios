@@ -39,6 +39,15 @@ describe("validateSchedule", () => {
     expect(v.issues.filter((i) => i.kind === "streak" && i.staffId === "ana")).toHaveLength(1);
   });
 
+  it("flags more than 3 libre days in a row, but not for mozos or across holidays", () => {
+    const { schedule } = base();
+    for (const d of ["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08"]) schedule.julio[d] = "D";
+    for (const d of ["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09"]) schedule["alberto-m"][d] = "D";
+    for (const d of ["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09"]) schedule.ana[d] = "V";
+    const v = validateSchedule(schedule, DEFAULT_STAFF, 2026, 10);
+    expect(v.issues.filter((i) => i.kind === "restStreak").map((i) => i.staffId)).toEqual(["julio"]);
+  });
+
   it("flags forbidden assignments (Marta night, senior night)", () => {
     const { schedule } = base();
     schedule.marta["2026-10-07"] = "N";

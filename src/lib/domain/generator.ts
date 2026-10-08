@@ -1,3 +1,4 @@
+import { validateSchedule } from "./validate";
 import { diffDays, isWeekend, monthDates } from "./dates";
 import { isOff, type GeneratorConfig, type GeneratorResult, type Schedule, type ShiftCode, type Staff, type Warning } from "./types";
 
@@ -9,6 +10,8 @@ const BLOCK_MAX = 5;
 const MIN_REST = 2;
 /** Hard legal limit of consecutive working days; going past the preferred maxStreak (5) up to this is a last resort. */
 const LEGAL_STREAK = 6;
+/** Nobody but mozos (or people on holiday) rests more than this many days in a row. */
+const MAX_REST_RUN = 3;
 
 /** Spread `count` rest days in blocks of two, evenly through the month. */
 export function autoJcRestDays(dates: string[], count: number): string[] {
@@ -51,7 +54,7 @@ export function planSeniorRests(dates: string[], seniorIds: string[], quota: num
   return rests;
 }
 
-export function generateSchedule(config: GeneratorConfig): GeneratorResult {
+function generateOnce(config: GeneratorConfig): GeneratorResult {
   const { year, month, staff } = config;
   const maxStreak = config.maxStreak ?? 5;
   const maxSeniorMornings = config.maxSeniorMornings ?? 6;
@@ -110,6 +113,7 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
         N: 0,
         blockLen: config.prevDay?.[r.id] && config.prevDay[r.id] !== "D" ? 1 : 0,
         restRun: MIN_REST,
+        dRun: 0,
         target: BLOCK_MIN,
       },
     ]),
@@ -156,6 +160,8 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
         if (s.last === slot) v += s.blockLen < BLOCK_MIN ? -70 : s.blockLen < s.target ? -35 : 30; // finish a started block, then end it at its target
         else if (s.last !== "D") v += 25; // avoid switching shift without a rest day
         else if (s.restRun < MIN_REST) v += 30; // rest at least MIN_REST days between blocks
+        if (s.dRun >= MAX_REST_RUN) v -= 150; // already rested the maximum: must work today
+        else if (s.dRun === MAX_REST_RUN - 1) v -= 40;
         return v;
       };
       const candidates: { id: string; score: number; senior: boolean }[] = pool.map((r) => ({
@@ -216,10 +222,11 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
       const off = offCode(r.id, d);
       const code = off ?? (taken.has(r.id) ? (schedule[r.id][d] as ShiftCode) : "D");
       set(r.id, d, code);
+      s.dRun = code === "D" ? s.dRun + 1 : 0; // holidays (V/B) do not count towards the 3-day rest limit
       if (isOff(code)) {
         s.streak = 0;
         s.blockLen = 0;
-        s.restRun++;
+        s.restRun = code === "D" ? s.restRun + 1 : MIN_REST;
       } else {
         s.streak++;
         s.worked++;
@@ -253,4 +260,25 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
     };
   }
   return { schedule, warnings, stats };
+}
+
+const ATTEMPTS = 24;
+
+/**
+ * The generator is a greedy day-by-day planner, so an unlucky tie-break can leave a gap or a long rest.
+ * Try a few deterministic variations (seed, seed+1, ...) and keep the best; stop at the first clean one.
+ */
+export function generateSchedule(config: GeneratorConfig): GeneratorResult {
+  const seed = config.seed ?? 0;
+  let best: { result: GeneratorResult; cost: number } | null = null;
+  for (let i = 0; i < ATTEMPTS; i++) {
+    const result = generateOnce({ ...config, seed: seed + i });
+    const issues = validateSchedule(result.schedule, config.staff, config.year, config.month).issues;
+    const hard = issues.filter((x) => x.kind === "coverage" || x.kind === "restStreak" || x.kind === "streak").length;
+    const soft = result.warnings.filter((w) => w.kind === "cap" || w.kind === "streak").length;
+    const cost = hard * 1000 + soft;
+    if (!best || cost < best.cost) best = { result, cost };
+    if (cost === 0) break;
+  }
+  return best!.result;
 }

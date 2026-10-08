@@ -48,6 +48,16 @@ describe("vacations and inactive days", () => {
     }
   });
 
+  it("nobody but mozos rests more than 3 days in a row (holidays and out-of-roster days excluded)", () => {
+    for (const st of staff.filter((x) => x.role !== "mozo")) {
+      let run = 0;
+      for (const d of dates) {
+        run = schedule[st.id][d] === "D" ? run + 1 : 0;
+        expect(run).toBeLessThanOrEqual(3);
+      }
+    }
+  });
+
   it("the temporary receptionist works while the others are away and is not scheduled after leaving", () => {
     const worked = (id: string, ds: string[]) => ds.filter((d) => ["M", "T", "N"].includes(schedule[id][d])).length;
     expect(worked(EXTRA_RECEPTIONIST.id, range(1, 20))).toBeGreaterThan(8);
