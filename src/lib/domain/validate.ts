@@ -1,6 +1,6 @@
 import { monthDates } from "./dates";
 import { allowedShifts } from "./rules";
-import { isOff, type Schedule, type ShiftCode, type Staff } from "./types";
+import { isActive, isOff, type Schedule, type ShiftCode, type Staff } from "./types";
 
 export interface Coverage {
   M: number;
@@ -71,6 +71,8 @@ export function validateSchedule(schedule: Schedule, staff: Staff[], year: numbe
         issues.push({ kind: "streak", date: d, staffId: s.id, message: `${s.name}: más de ${MAX_CONSECUTIVE_DAYS} días seguidos trabajando (hasta el ${d})` });
       const code = schedule[s.id]?.[d];
       if (!code) return;
+      if (!isActive(s, d) && !isOff(code))
+        issues.push({ kind: "forbidden", date: d, staffId: s.id, message: `${s.name} no está en plantilla el ${d}` });
       if (!allowedShifts(s).includes(code))
         issues.push({ kind: "forbidden", date: d, staffId: s.id, message: `${s.name} no puede hacer ${code}` });
       if ((i > 0 || start.prev) && (s.role === "receptionist" || s.extraShifts)) {

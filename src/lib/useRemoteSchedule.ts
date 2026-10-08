@@ -10,14 +10,14 @@ import type { AuthState } from "./useAuth";
 
 const QUEUE_KEY = "horarios:queue";
 
-const readQueue = (): Row[] => {
+export const readQueue = (): Row[] => {
   try {
     return JSON.parse(localStorage.getItem(QUEUE_KEY) ?? "[]") as Row[];
   } catch {
     return [];
   }
 };
-const writeQueue = (q: Row[]) => {
+export const writeQueue = (q: Row[]) => {
   try {
     localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
   } catch {}

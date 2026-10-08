@@ -140,7 +140,8 @@ describe("restructuring the team", () => {
   it("someone leaving changes far fewer cells than re-planning the whole month", () => {
     const plan = planRestructure(ctx({ today: d(8) }), DEFAULT_STAFF.map((s) => (s.id === "marcos" ? { ...s, activeTo: d(10) } : s)), d(1));
     expect(plan.level).not.toBe("red");
-    expect(plan.changes.length).toBeLessThan(40);
+    // his own days after the baja all become "B"; the rest of the changes is what is needed to cover them
+    expect(plan.changes.filter((c) => c.to !== "B").length).toBeLessThan(40);
   });
 });
 

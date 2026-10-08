@@ -27,13 +27,15 @@ npm test           # generador, validación, exportación, sincronización
 
 En Vercel define las mismas dos variables en *Project Settings → Environment Variables*.
 
-## Equipo editable
+## Equipo (página `/equipo`)
 
-Las personas se pueden arrastrar por el asa de la cuadrícula (o con las flechas del panel *Equipo*) para
-cambiar el orden, soltarlas en otra sección para cambiar de puesto, renombrarlas, añadirlas, eliminarlas y
-ponerles fecha de alta y baja. Sin Supabase se guarda en el dispositivo; con Supabase se guarda en la tabla
-`staff` (`sort_order`, `role`, fechas…) y se comparte en tiempo real. La primera editora que entra publica el
-equipo que tenga en local si la tabla está vacía.
+La plantilla se gestiona en su propia página: tarjetas por puesto (Dirección, Apoyo / Partido, Recepción,
+Noche, Mozos) con arrastrar y soltar para reordenar o cambiar de puesto, nombre editable, fechas de alta y
+baja, "Dar de baja", volver a la plantilla y "Añadir persona". Cualquier cambio que altere quién trabaja
+se planifica sobre el mes actual y los meses guardados posteriores, y enseña los cambios por mes antes de
+aplicarlos. En la cuadrícula del horario también se puede arrastrar a una persona a otra sección.
+Sin Supabase se guarda en el dispositivo; con Supabase, en la tabla `staff` (`sort_order`, `role`, fechas…),
+compartido en tiempo real. La primera editora que entra publica el equipo local si la tabla está vacía.
 
 ## Reajustes con mínimo cambio
 

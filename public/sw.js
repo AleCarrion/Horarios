@@ -1,7 +1,7 @@
 // Offline-first service worker. Bump VERSION to invalidate old caches.
-const VERSION = "v1";
+const VERSION = "v2";
 const CACHE = `horarios-${VERSION}`;
-const PRECACHE = ["/", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png", "/manifest.webmanifest"];
+const PRECACHE = ["/", "/equipo", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
@@ -33,12 +33,12 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Pages: network first, fall back to the cached shell when offline.
+  // Pages: network first, fall back to the cached copy of that page (or the main one) when offline.
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
-        .then((r) => put("/", r))
-        .catch(() => caches.match("/").then((hit) => hit || Response.error())),
+        .then((r) => put(request, r))
+        .catch(() => caches.match(request).then((hit) => hit || caches.match("/")).then((hit) => hit || Response.error())),
     );
     return;
   }
