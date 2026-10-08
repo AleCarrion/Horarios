@@ -1,3 +1,4 @@
+import type { Rules } from "./ruleset";
 /** V = vacaciones, B = fuera de plantilla (not employed that day). Both count as non-working. */
 export type ShiftCode = "M" | "T" | "N" | "S" | "P" | "MZ" | "D" | "V" | "A" | "B";
 
@@ -56,6 +57,8 @@ export interface GeneratorConfig {
   maxStreak?: number;
   /** Local holidays (YYYY-MM-DD) on top of the national ones; the director rests on all of them. */
   extraHolidays?: string[];
+  /** The hotel's editable rules (defaults when omitted). */
+  rules?: Rules;
   /** The previous month (or just its last days): streaks, rest runs and shift blocks carry over into this month. */
   history?: Schedule;
   /** Shift of each staff member on the day before day 1 (cross-month rules). Superseded by `history`. */

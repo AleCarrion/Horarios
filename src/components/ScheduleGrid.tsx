@@ -57,13 +57,15 @@ interface Props {
   preview?: Set<string>;
   readOnly?: boolean;
   today?: string | null;
+  /** Local holidays on top of the national ones. */
+  holidays?: string[];
   /** Show only these days (a week on phones); `undefined` = the whole month. */
   dates?: string[];
   /** Bigger touch targets and a table that fills the width (week view on phones). */
   compact?: boolean;
 }
 
-export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, onCalendar, onMove, onPlan, onSwap, locked, onLock, preview, readOnly, today, dates: only, compact }: Props) {
+export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, onCalendar, onMove, onPlan, onSwap, locked, onLock, preview, readOnly, today, dates: only, compact, holidays }: Props) {
   const dates = monthDates(year, month);
   const cols = only ?? dates;
   const [menu, setMenu] = useState<{ staff: Staff; date: string; x: number; y: number } | null>(null);
@@ -221,11 +223,11 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                     key={d}
                     scope="col"
                     data-colhead={d}
-                    title={isHoliday(d) ? "Festivo" : undefined}
+                    title={isHoliday(d, holidays) ? "Festivo" : undefined}
                     className={`${compact ? "min-w-0" : "min-w-9"} rounded-xl px-0.5 py-1.5 text-center font-semibold transition-colors ${
                       isToday
                         ? "bg-gradient-to-b from-brand to-brand-2 text-white shadow-md"
-                        : isHoliday(d)
+                        : isHoliday(d, holidays)
                           ? "bg-[#ffff00] text-black"
                           : isWeekend(d)
                           ? "bg-accent/15 text-accent"

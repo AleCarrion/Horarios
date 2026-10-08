@@ -1,3 +1,5 @@
+import { readRules } from "./rulesStore";
+import type { Rules } from "./domain/ruleset";
 import { monthDates } from "./domain/dates";
 import { planRestructure, type Plan } from "./domain/repair";
 import type { Schedule, Staff } from "./domain/types";
@@ -16,6 +18,7 @@ export interface PlanningDeps {
   historyFor: (y: number, m: number, staff: Staff[]) => Schedule | undefined;
   nextStored: (y: number, m: number) => Schedule | undefined;
   locksFor: (y: number, m: number) => Locks;
+  rules?: () => Rules;
 }
 
 const storedMonthsFromStorage = (): { y: number; m: number }[] => {
@@ -29,7 +32,7 @@ const storedMonthsFromStorage = (): { y: number; m: number }[] => {
   return out;
 };
 
-export const realDeps: PlanningDeps = { storedMonths: storedMonthsFromStorage, scheduleFor, historyFor, nextStored, locksFor: readLocks };
+export const realDeps: PlanningDeps = { storedMonths: storedMonthsFromStorage, scheduleFor, historyFor, nextStored, locksFor: readLocks, rules: readRules };
 
 const keyOf = (c: { y: number; m: number }) => c.y * 100 + c.m;
 
@@ -61,6 +64,7 @@ export function planTeamChange(oldStaff: Staff[], newStaff: Staff[], today: stri
         history: previous ?? deps.historyFor(y, m, oldStaff),
         next: deps.nextStored(y, m),
         locked: deps.locksFor(y, m),
+        rules: deps.rules?.(),
       },
       newStaff,
       `${y}-${String(m).padStart(2, "0")}-01`,

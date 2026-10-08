@@ -1,5 +1,6 @@
 import { monthDates } from "./dates";
 import { allowedShifts } from "./rules";
+import { DEFAULT_RULES, type Rules } from "./ruleset";
 import { isActive, isOff, type Schedule, type ShiftCode, type Staff } from "./types";
 
 export interface Coverage {
@@ -27,7 +28,9 @@ export interface Validation {
 }
 
 /** Each of M/T/N needs exactly one person per day; extra people are flagged as over-coverage. */
-export function validateSchedule(schedule: Schedule, staff: Staff[], year: number, month: number, history?: Schedule): Validation {
+export function validateSchedule(schedule: Schedule, staff: Staff[], year: number, month: number, history?: Schedule, rules: Rules = DEFAULT_RULES): Validation {
+  const MAX_CONSECUTIVE_DAYS = rules.maxWorkRun;
+  const MAX_REST_RUN = rules.maxRestRun;
   const dates = monthDates(year, month);
   const coverage: Record<string, Coverage> = {};
   const issues: Issue[] = [];
@@ -39,7 +42,7 @@ export function validateSchedule(schedule: Schedule, staff: Staff[], year: numbe
       if (code === "M" || code === "T" || code === "N") c[code]++;
     }
     c.ok = c.M === 1 && c.T === 1 && c.N === 1;
-    if (staff.filter((s) => schedule[s.id]?.[d] === "P").length > 1) issues.push({ kind: "coverage", date: d, message: `Hay más de una persona de partido el ${d}` });
+    if (rules.onePartido && staff.filter((s) => schedule[s.id]?.[d] === "P").length > 1) issues.push({ kind: "coverage", date: d, message: `Hay más de una persona de partido el ${d}` });
     coverage[d] = c;
     for (const k of ["M", "T", "N"] as const) {
       if (c[k] === 0) issues.push({ kind: "coverage", date: d, message: `Falta cobertura de ${k} el ${d}` });

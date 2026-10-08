@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarIcon, UsersIcon } from "./icons";
+import { CalendarIcon, SlidersIcon, UsersIcon } from "./icons";
 
 const LINKS = [
   { href: "/", label: "Horario", Icon: CalendarIcon },
   { href: "/equipo", label: "Equipo", Icon: UsersIcon },
+  { href: "/reglas", label: "Reglas", Icon: SlidersIcon },
 ];
 
 /** Horario / Equipo tabs shared by every page header. */

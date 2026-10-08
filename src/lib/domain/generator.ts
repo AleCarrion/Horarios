@@ -1,4 +1,5 @@
 import { holidaysOf } from "./holidays";
+import { DEFAULT_RULES, localHolidaysOf } from "./ruleset";
 import { validateSchedule } from "./validate";
 import { diffDays, isWeekend, monthDates, toISO } from "./dates";
 import { isActive, isOff, type GeneratorConfig, type GeneratorResult, type Schedule, type ShiftCode, type Staff, type Warning } from "./types";
@@ -10,9 +11,7 @@ const BLOCK_MIN = 3;
 const BLOCK_MAX = 5;
 const MIN_REST = 2;
 /** Hard legal limit of consecutive working days; going past the preferred maxStreak (5) up to this is a last resort. */
-const LEGAL_STREAK = 6;
 /** Nobody but mozos (or people on holiday) rests more than this many days in a row. */
-const MAX_REST_RUN = 3;
 /** When repairing a schedule, how much the planner prefers keeping someone on the shift they already had. */
 const BASELINE_KEEP = 80;
 
@@ -82,8 +81,11 @@ export function planSeniorRests(
 }
 
 export function generateOnce(config: GeneratorConfig): GeneratorResult {
+  const rules = config.rules ?? DEFAULT_RULES;
+  const LEGAL_STREAK = rules.maxWorkRun;
+  const MAX_REST_RUN = rules.maxRestRun;
   const { year, month, staff } = config;
-  const maxStreak = config.maxStreak ?? 5;
+  const maxStreak = config.maxStreak ?? rules.preferredWorkRun;
   const maxSeniorMornings = config.maxSeniorMornings ?? 6;
   const seed = config.seed ?? 0;
   const dates = monthDates(year, month);
@@ -95,7 +97,7 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
   };
 
   const byId = new Map(staff.map((x) => [x.id, x]));
-  const holidays = holidaysOf(year, config.extraHolidays);
+  const holidays = holidaysOf(year, [...(config.extraHolidays ?? []), ...localHolidaysOf(rules, year)]);
 
   /** What a person was doing right before day 1 (from the previous month), to carry streaks and blocks over. */
   const tail = (id: string) => {
@@ -276,7 +278,7 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
       if (slot !== "N")
         for (const s of (() => {
           const within = seniorsFor(slot, d).filter((x) => !taken.has(x.id));
-          return within.length || partidos() < 2 ? within : seniorsFor(slot, d, true).filter((x) => !taken.has(x.id));
+          return within.length || !rules.onePartido || partidos() < 2 ? within : seniorsFor(slot, d, true).filter((x) => !taken.has(x.id));
         })())
           candidates.push({
             id: s.id,
@@ -330,7 +332,7 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
       }
       warnings.push({ kind: "coverage", date: d, shift: slot, message: `Sin cobertura de ${slot} el ${d}` });
     }
-    if (config.baseline && partidos() > 1) {
+    if (rules.onePartido && config.baseline && partidos() > 1) {
       // repairing and nobody could cover: one senior rests that day instead (never a rest run longer than 3 days)
       const runAround = (id: string) => {
         let n = 1;
@@ -402,7 +404,7 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
   let best: { result: GeneratorResult; cost: number } | null = null;
   for (let i = 0; i < ATTEMPTS; i++) {
     const result = generateOnce({ ...config, seed: seed + i });
-    const issues = validateSchedule(result.schedule, config.staff, config.year, config.month, config.history).issues;
+    const issues = validateSchedule(result.schedule, config.staff, config.year, config.month, config.history, config.rules).issues;
     const hard = issues.filter((x) => x.kind === "coverage" || x.kind === "restStreak" || x.kind === "streak").length;
     const soft = result.warnings.filter((w) => w.kind === "cap" || w.kind === "streak").length;
     const cost = hard * 1000 + soft;

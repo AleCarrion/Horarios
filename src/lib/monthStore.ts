@@ -1,4 +1,5 @@
 import { generateSchedule } from "./domain/generator";
+import { readRules } from "./rulesStore";
 import type { Schedule, Staff } from "./domain/types";
 
 /** Months before this one are generated without history. */
@@ -31,10 +32,11 @@ export const clearScheduleCache = () => cache.clear();
 export function scheduleFor(y: number, m: number, staff: Staff[]): Schedule {
   const stored = readStored(y, m);
   if (stored) return stored;
-  const key = `${y}-${m}|${JSON.stringify(staff)}`;
+  const rules = readRules();
+  const key = `${y}-${m}|${JSON.stringify(staff)}|${JSON.stringify(rules)}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const result = generateSchedule({ year: y, month: m, staff, history: historyFor(y, m, staff) }).schedule;
+  const result = generateSchedule({ year: y, month: m, staff, rules, history: historyFor(y, m, staff) }).schedule;
   cache.set(key, result);
   return result;
 }
@@ -56,7 +58,7 @@ const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
 /** The schedule if it costs nothing to know it: saved by the user, or already planned in this session. */
 export function peekFor(y: number, m: number, staff: Staff[]): Schedule | undefined {
-  return readStored(y, m) ?? cache.get(`${y}-${m}|${JSON.stringify(staff)}`);
+  return readStored(y, m) ?? cache.get(`${y}-${m}|${JSON.stringify(staff)}|${JSON.stringify(readRules())}`);
 }
 
 /**

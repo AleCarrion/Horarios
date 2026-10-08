@@ -52,7 +52,7 @@ test("copia de seguridad: guardar, perder los datos y restaurar deja todo igual"
   await page.getByRole("checkbox").uncheck();
   await page.getByRole("option", { name: /Libre/ }).click(); // saved on this device
   await page.waitForTimeout(500);
-  const before = await page.evaluate(() => JSON.stringify(Object.fromEntries(Object.entries(localStorage).filter(([k]) => k.startsWith("horarios:") && k !== "horarios:queue"))));
+  const before = await page.evaluate(() => JSON.stringify(Object.entries(localStorage).filter(([k]) => k.startsWith("horarios:") && k !== "horarios:queue").sort(([a], [b]) => a.localeCompare(b))));
   await page.getByRole("button", { name: /Exportar/ }).click();
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("menuitem", { name: /Guardar copia/ }).click()]);
   const file = await download.path();
@@ -62,7 +62,7 @@ test("copia de seguridad: guardar, perder los datos y restaurar deja todo igual"
   await page.getByLabel("Archivo de copia de seguridad").setInputFiles(file);
   await page.getByRole("button", { name: "Sí, restaurar" }).click();
   await page.waitForSelector(".schedule-table");
-  const after = await page.evaluate(() => JSON.stringify(Object.fromEntries(Object.entries(localStorage).filter(([k]) => k.startsWith("horarios:") && k !== "horarios:queue"))));
+  const after = await page.evaluate(() => JSON.stringify(Object.entries(localStorage).filter(([k]) => k.startsWith("horarios:") && k !== "horarios:queue").sort(([a], [b]) => a.localeCompare(b))));
   expect(after).toBe(before);
 });
 
@@ -92,6 +92,22 @@ test("el resumen del mes enseña a todas las personas", async ({ page }) => {
   const table = page.getByRole("table", { name: /Turnos, libres/ });
   await expect(table).toBeVisible();
   await expect(table.getByRole("row")).toHaveCount(10); // header + 9 people
+});
+
+test("reglas: los cambios se guardan, se recuerdan y se pueden restablecer", async ({ page }) => {
+  await page.goto("/reglas");
+  await expect(page.getByRole("heading", { name: "Reglas del horario" })).toBeVisible();
+  await page.getByRole("button", { name: "Más: Máximo de días libres seguidos" }).click();
+  await page.locator("input[type=date]").fill("2026-09-08");
+  await page.getByLabel("Se repite cada año").uncheck();
+  await page.getByRole("button", { name: "Añadir" }).click();
+  await expect(page.getByText("8 de septiembre de 2026")).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("group", { name: "Máximo de días libres seguidos" }).getByRole("status")).toHaveText("4");
+  await expect(page.getByText("8 de septiembre de 2026")).toBeVisible();
+  await page.getByRole("button", { name: "Volver a las reglas del hotel" }).click();
+  await expect(page.getByRole("group", { name: "Máximo de días libres seguidos" }).getByRole("status")).toHaveText("3");
+  await expect(page.getByText("Todavía no hay ninguno.")).toBeVisible();
 });
 
 test("la página de equipo lista la plantilla", async ({ page }) => {

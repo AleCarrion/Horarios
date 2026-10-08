@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarIcon, InboxIcon, UsersIcon } from "./icons";
+import { CalendarIcon, InboxIcon, SlidersIcon, UsersIcon } from "./icons";
 
 interface Props {
   /** Number of pending requests (badge). */
@@ -29,6 +29,10 @@ export function MobileTabBar({ pending = 0, onRequests }: Props) {
       <Link href="/equipo" aria-current={path === "/equipo" ? "page" : undefined} className={`${tab} ${path === "/equipo" ? on : off}`}>
         <UsersIcon width={22} height={22} />
         Equipo
+      </Link>
+      <Link href="/reglas" aria-current={path === "/reglas" ? "page" : undefined} className={`${tab} ${path === "/reglas" ? on : off}`}>
+        <SlidersIcon width={22} height={22} />
+        Reglas
       </Link>
       {onRequests ? (
         <button onClick={onRequests} className={`${tab} ${off}`}>

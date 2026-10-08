@@ -9,6 +9,7 @@ interface Props {
   staff: Staff[];
   year: number;
   month: number;
+  holidays?: string[];
 }
 
 const COLS: { key: "M" | "T" | "N" | "other" | "libres" | "vacaciones" | "ausencias" | "weekends" | "holidays" | "hours"; label: string; title: string }[] = [
@@ -25,8 +26,8 @@ const COLS: { key: "M" | "T" | "N" | "other" | "libres" | "vacaciones" | "ausenc
 ];
 
 /** Who has done what this month, to see at a glance that nights, weekends and holidays are shared fairly. */
-export function MonthSummary({ schedule, staff, year, month }: Props) {
-  const rows = useMemo(() => summarizeMonth(schedule, staff, year, month), [schedule, staff, year, month]);
+export function MonthSummary({ schedule, staff, year, month, holidays }: Props) {
+  const rows = useMemo(() => summarizeMonth(schedule, staff, year, month, holidays), [schedule, staff, year, month, holidays]);
   const byRole = (id: string) => staff.find((s) => s.id === id)?.role;
   // the highest value among people of the same role is highlighted (only when it is above the lowest, i.e. there is something to compare)
   const extremes = useMemo(() => {

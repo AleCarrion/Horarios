@@ -36,6 +36,8 @@ import { MobileTabBar } from "./MobileTabBar";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { PlanDialog } from "./PlanDialog";
 import { MonthSummary } from "./MonthSummary";
+import { DEFAULT_RULES, localHolidaysOf, type Rules } from "@/lib/domain/ruleset";
+import { readRules } from "@/lib/rulesStore";
 import { ScheduleGrid } from "./ScheduleGrid";
 import { StatCards } from "./StatCards";
 
@@ -85,11 +87,13 @@ export function ScheduleApp() {
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   // On phones the month is shown a week at a time: 7 big columns instead of 31 tiny ones
+  const [rules, setRules] = useState<Rules>(DEFAULT_RULES);
   const [view, setView] = useState<"week" | "month">("month");
   const [weekIdx, setWeekIdx] = useState(0);
   useEffect(() => {
     // localStorage / the clock are only safe to read after mount
     setRequests(readRequests()); // eslint-disable-line react-hooks/set-state-in-effect
+    setRules(readRules());
     if (window.matchMedia("(max-width: 639px)").matches) setView("week");
     if (new URLSearchParams(window.location.search).get("solicitudes")) setPanelOpen(true);
     const t = new Date();
@@ -158,8 +162,8 @@ export function ScheduleApp() {
 
   const shown = plan?.plan.schedule ?? h.present; // while a request is previewed the grid shows it
   const validation = useMemo(
-    () => validateSchedule(shown, visible, ym.year, ym.month, history),
-    [shown, ym, visible, history],
+    () => validateSchedule(shown, visible, ym.year, ym.month, history, rules),
+    [shown, ym, visible, history, rules],
   );
 
   const stats = useMemo(() => {
@@ -196,6 +200,7 @@ export function ScheduleApp() {
         year: ym.year,
         month: ym.month,
         staff: list,
+        rules,
         seed: Date.now() % 97,
         history,
         unavailable,
@@ -232,7 +237,7 @@ export function ScheduleApp() {
     const person = staff.find((x) => x.id === staffId);
     const all = Object.keys(h.present[staffId] ?? {}).sort();
     const to = all[Math.min(all.indexOf(from) + days - 1, all.length - 1)] ?? from;
-    const ctx = { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: locks };
+    const ctx = { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: locks, rules };
     const result = kind === "M" || kind === "T" || kind === "N" ? planShiftPref(ctx, staffId, from, to, kind) : kind === "A" ? planAbsence(ctx, staffId, from, to) : planDayOff(ctx, staffId, from, kind, to);
     const label = kind === "V" ? "Vacaciones" : kind === "A" ? "Ausencia imprevista" : kind === "D" ? "Libre solicitado" : `Turno pedido (${{ M: "mañanas", T: "tardes", N: "noches" }[kind]})`;
     setPlan({
@@ -243,14 +248,14 @@ export function ScheduleApp() {
   const requestSwap = (a: string, b: string, date: string, returnDate?: string) => {
     const pa = staff.find((x) => x.id === a);
     const pb = staff.find((x) => x.id === b);
-    const result = planShiftSwap({ year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: locks }, a, b, date, returnDate);
+    const result = planShiftSwap({ year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: locks, rules }, a, b, date, returnDate);
     setPlan({
       plan: result,
       title: `Cambio de turno · ${pa?.name} ↔ ${pb?.name} · ${Number(date.slice(8))}${returnDate ? ` y ${Number(returnDate.slice(8))}` : ""} ${MONTHS[ym.month - 1].toLowerCase()}`,
     });
   };
   const fixIssues = () => {
-    const result = planFix({ year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: locks });
+    const result = planFix({ year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: locks, rules });
     setPlan({ plan: result, title: `Arreglar avisos · ${MONTHS[ym.month - 1].toLowerCase()}` });
   };
   /** Jump to the day an issue is about: right week, scrolled into view, highlighted. */
@@ -297,6 +302,7 @@ export function ScheduleApp() {
       history: current ? history : historyFor(y, m, staff),
       next: nextStored(y, m),
       locked: current ? locks : readLocks(y, m),
+      rules,
     };
   };
   // a new object whenever the schedule, locks, team or date change: the inbox recalculates its traffic lights
@@ -564,6 +570,7 @@ export function ScheduleApp() {
             onPlan={readOnly ? undefined : requestDays}
             onSwap={readOnly ? undefined : requestSwap}
             preview={previewCells}
+            holidays={localHolidaysOf(rules, ym.year)}
           />
           </div>
         )}
@@ -608,7 +615,7 @@ export function ScheduleApp() {
           )}
         </section>
 
-        <MonthSummary schedule={shown} staff={visible} year={ym.year} month={ym.month} />
+        <MonthSummary schedule={shown} staff={visible} year={ym.year} month={ym.month} holidays={localHolidaysOf(rules, ym.year)} />
 
       </main>
       <MobileTabBar pending={requests.filter((r) => r.status === "pending").length} onRequests={() => setPanelOpen(true)} />
