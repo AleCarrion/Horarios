@@ -173,10 +173,11 @@ describe("seniors as cover", () => {
     for (const id of recepIds) expect(stats[id].rest).toBeGreaterThanOrEqual(10);
   });
 
-  it("reports a cap warning instead of leaving a gap when seniors are stretched", () => {
+  it("reports a cap or streak warning instead of leaving a gap when seniors are stretched", () => {
     const staff = DEFAULT_STAFF.map((x) => (x.role === "senior" ? { ...x, maxCovers: 1 } : x));
     const r = generateSchedule({ year: 2026, month: 10, staff });
-    expect(r.warnings.some((w) => w.kind === "cap")).toBe(true);
+    expect(r.warnings.filter((w) => w.kind === "coverage")).toEqual([]);
+    expect(r.warnings.some((w) => w.kind === "cap" || w.kind === "streak")).toBe(true);
   });
 });
 

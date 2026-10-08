@@ -7,6 +7,8 @@ const SENIOR_PENALTY = 100;
 const BLOCK_MIN = 3;
 const BLOCK_MAX = 5;
 const MIN_REST = 2;
+/** Hard legal limit of consecutive working days; going past the preferred maxStreak (5) up to this is a last resort. */
+const LEGAL_STREAK = 6;
 
 /** Spread `count` rest days in blocks of two, evenly through the month. */
 export function autoJcRestDays(dates: string[], count: number): string[] {
@@ -166,6 +168,26 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
           });
       candidates.sort((a, b) => a.score - b.score);
       let pick = candidates[0];
+      if (!pick) {
+        // Everyone is at the preferred limit: a legal 6th working day (or an extra night) beats an uncovered shift.
+        const relaxed = recs
+          .filter((r) => {
+            const s = st[r.id];
+            if (taken.has(r.id) || s.streak >= LEGAL_STREAK) return false;
+            if (s.last === "N" && slot !== "N") return false;
+            return !(slot === "M" && s.last === "T");
+          })
+          .sort((a, b) => score(a, recs.indexOf(a)) - score(b, recs.indexOf(b)))[0];
+        if (relaxed) {
+          pick = { id: relaxed.id, score: 0, senior: false };
+          warnings.push({
+            kind: "streak",
+            date: d,
+            shift: slot,
+            message: `${relaxed.name} trabaja ${st[relaxed.id].streak + 1} días seguidos el ${d} para cubrir ${slot}`,
+          });
+        }
+      }
       if (!pick && slot !== "N") {
         // Last resort: a senior over their cap beats an uncovered shift.
         const over = seniorsFor(slot, d, true).find((x) => !taken.has(x.id));

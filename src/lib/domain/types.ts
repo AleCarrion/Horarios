@@ -56,8 +56,8 @@ export interface GeneratorConfig {
 }
 
 export interface Warning {
-  /** "coverage": a shift is uncovered. "cap": a senior went over their monthly cover limit to avoid a gap. */
-  kind: "coverage" | "cap";
+  /** "coverage": a shift is uncovered. "cap": a senior went over their monthly cover limit to avoid a gap. "streak": a receptionist works a 6th day (legal limit) to avoid a gap. */
+  kind: "coverage" | "cap" | "streak";
   date: string;
   shift: "M" | "T" | "N";
   message: string;

@@ -91,3 +91,18 @@ describe.each([1, 2, 4, 6, 9, 10, 11, 12])("generator vs real figures, month %i"
     expect(warnings.filter((w) => w.kind === "coverage")).toEqual([]);
   });
 });
+
+describe("month with extra JC rest (course): real October JC rests", () => {
+  const jcRest = dates.filter((d) => real.jc[d] === "D");
+  const { schedule: s, warnings } = generateSchedule({ year: 2026, month: 10, staff: DEFAULT_STAFF, jcRestDays: jcRest });
+
+  it("covers every shift without anyone exceeding 6 days in a row", () => {
+    expect(warnings.filter((w) => w.kind === "coverage")).toEqual([]);
+    for (const id of Object.keys(s)) expect(maxStreak(s[id], dates)).toBeLessThanOrEqual(6);
+  });
+
+  it("keeps JC's rests as given and shares the nights", () => {
+    expect(dates.filter((d) => s.jc[d] === "D")).toEqual(jcRest);
+    for (const id of ["alberto-r", "alejandro", "marcos"]) expect(count(s[id], dates, "N")).toBeLessThanOrEqual(4);
+  });
+});

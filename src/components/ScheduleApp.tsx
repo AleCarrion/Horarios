@@ -86,7 +86,14 @@ export function ScheduleApp() {
     try { localStorage.removeItem(storageKey(ym.year, ym.month)); } catch {}
     dispatch({
       type: "reset",
-      schedule: generateSchedule({ year: ym.year, month: ym.month, staff: DEFAULT_STAFF, seed: Date.now() % 97 }).schedule,
+      schedule: generateSchedule({
+        year: ym.year,
+        month: ym.month,
+        staff: DEFAULT_STAFF,
+        seed: Date.now() % 97,
+        // JC's rest days are an input (e.g. a course month): edit them in the grid, then regenerate around them.
+        jcRestDays: Object.entries(h.present.jc ?? {}).filter(([, c]) => c === "D").map(([d]) => d),
+      }).schedule,
     });
   };
 
