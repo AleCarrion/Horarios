@@ -17,7 +17,7 @@ npm test           # generador, validación, exportación, sincronización
 
 ## Configurar Supabase
 
-1. Crea un proyecto y ejecuta, por este orden, `supabase/migrations/0001_init.sql`, `supabase/migrations/0002_staff_order.sql` y `supabase/seed.sql` (SQL editor).
+1. Crea un proyecto y ejecuta, por este orden, `supabase/migrations/0001_init.sql`, `supabase/migrations/0002_staff_order.sql`, `supabase/migrations/0003_requests_locks.sql` y `supabase/seed.sql` (SQL editor).
 2. En *Authentication → URL configuration* añade la URL de la app (y `http://localhost:3000`) como redirect.
 3. Copia `.env.example` a `.env.local` y rellena la URL y la clave *anon*.
 4. Inicia sesión una vez con el correo de la jefa (enlace mágico) y ejecuta en el SQL editor:
@@ -50,4 +50,4 @@ El botón de la bandeja (arriba a la derecha) abre las solicitudes: *libre*, *va
 de cualquier persona. Cada una se planifica con el motor sobre su mes y sale con semáforo (verde, ámbar,
 rojo con motivo), antelación (recomendado: un mes, solo informativo) y coincidencias con otras peticiones.
 "Revisar y aprobar" abre la vista previa de cambios; al aplicar, la solicitud queda aprobada y lo pedido
-bloqueado. Rechazar pide un motivo. De momento se guardan en el dispositivo; el siguiente paso es Supabase.
+bloqueado. Rechazar pide un motivo. Se guardan en el dispositivo y, con Supabase, en las tablas `requests` y `locked_cells` (solo editoras; el acceso de los trabajadores queda para el final).

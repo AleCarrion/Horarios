@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { daysInMonth, toISO } from "./domain/dates";
 import type { Schedule, ShiftCode } from "./domain/types";
+import { clearScheduleCache, nextMonth, prevMonth, storageKey } from "./monthStore";
 import { getSupabase, remoteConfigured } from "./supabase";
 import { coalesce, diffSchedules, rowsToSchedule, scheduleToRows, type Row } from "./sync";
 import type { AuthState } from "./useAuth";
@@ -69,12 +70,30 @@ export function useRemoteSchedule({ year, month, present, auth, onLoaded, onRemo
     let alive = true;
     const first = toISO(year, month, 1);
     const last = toISO(year, month, daysInMonth(year, month));
+    // One query for the month and its neighbours: the previous month is the history that streaks carry over from,
+    // and the next one must not be broken by a change at the end of this one.
+    const p = prevMonth(year, month);
+    const n = nextMonth(year, month);
     sb.from("monthly_schedule")
       .select("staff_id, day, shift_code")
-      .gte("day", first)
-      .lte("day", last)
-      .then(({ data, error }) => {
+      .gte("day", toISO(p.y, p.m, 1))
+      .lte("day", toISO(n.y, n.m, daysInMonth(n.y, n.m)))
+      .then(({ data: all, error }) => {
         if (!alive) return;
+        const data = (all as Row[] | null)?.filter((r) => r.day >= first && r.day <= last) ?? null;
+        if (!error && all) {
+          // cache the published neighbouring months so the planner sees the real data
+          for (const nb of [p, n]) {
+            const a = toISO(nb.y, nb.m, 1);
+            const z = toISO(nb.y, nb.m, daysInMonth(nb.y, nb.m));
+            const rows = (all as Row[]).filter((r) => r.day >= a && r.day <= z);
+            if (rows.length)
+              try {
+                localStorage.setItem(storageKey(nb.y, nb.m), JSON.stringify(rowsToSchedule(rows)));
+                clearScheduleCache();
+              } catch {}
+          }
+        }
         if (error || !data) {
           // Offline: keep the locally cached month and queue edits against it.
           base.current = presentRef.current;
@@ -82,7 +101,7 @@ export function useRemoteSchedule({ year, month, present, auth, onLoaded, onRemo
           return;
         }
         if (data.length) {
-          const s = rowsToSchedule(data as Row[]);
+          const s = rowsToSchedule(data);
           base.current = s;
           setDraft(false);
           setUnpublished(false);

@@ -7,6 +7,8 @@ import { DEFAULT_STAFF } from "@/lib/domain/roster";
 import { addStaff, changeRole, moveStaff, updateStaff } from "@/lib/domain/team";
 import { clearScheduleCache, historyFor, lockedCount, nextStored, scheduleFor, peekFor, prevMonth, readLocks, readStored, scheduleForAsync, setLocked, storageKey, writeLocks, type Locks } from "@/lib/monthStore";
 import { readRoster, writeRoster } from "@/lib/staffStore";
+import { useRemoteLocks } from "@/lib/useRemoteLocks";
+import { useRemoteRequests } from "@/lib/useRemoteRequests";
 import { useRemoteStaff } from "@/lib/useRemoteStaff";
 import { diffSchedules } from "@/lib/sync";
 import { activeInMonth, isActive, type Role, type Schedule, type ShiftCode, type Staff } from "@/lib/domain/types";
@@ -308,7 +310,6 @@ export function ScheduleApp() {
     };
   };
   // a new object whenever the schedule, locks, team or date change: the inbox recalculates its traffic lights
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const requestsVersion = useMemo(() => ({ present: h.present, locks, staff, today }), [h.present, locks, staff, today]);
   const evaluateRequest = (r: ShiftRequest): Plan | null => {
     const { year, month } = requestMonth(r);
@@ -322,6 +323,25 @@ export function ScheduleApp() {
     setPlan({ plan: p, title: `${KIND_LABEL[r.kind]} · ${who} · ${Number(r.date.slice(8))}${r.endDate && r.endDate !== r.date ? `–${Number(r.endDate.slice(8))}` : ""} ${MONTHS[month - 1].toLowerCase()}`, request: r });
   };
   const rejectRequest = (r: ShiftRequest, note: string) => saveRequests(requests.map((x) => (x.id === r.id ? decide(x, "rejected", note) : x)));
+
+  const requestsRemote = useRemoteRequests({
+    auth,
+    requests,
+    onLoaded: (rs) => {
+      setRequests(rs);
+      writeRequests(rs);
+    },
+  });
+  const locksRemote = useRemoteLocks({
+    auth,
+    year: ym.year,
+    month: ym.month,
+    locks,
+    onLoaded: (l) => {
+      setLocks(l);
+      writeLocks(ym.year, ym.month, l);
+    },
+  });
 
   const changeLocks = (staffId: string, dates: string[], on: boolean) => {
     const next = setLocked(locks, dates.map((date) => ({ staffId, date })), on);
@@ -417,7 +437,7 @@ export function ScheduleApp() {
       </header>
 
       <main className="mx-auto w-full min-w-0 max-w-[1500px] space-y-4 p-4">
-        {remoteConfigured && <AuthBar auth={auth} status={staffRemote.pending && remote.status === "synced" ? "pending" : remote.status} />}
+        {remoteConfigured && <AuthBar auth={auth} status={(staffRemote.pending || requestsRemote.pending || locksRemote.pending) && remote.status === "synced" ? "pending" : remote.status} />}
 
         <StatCards coveragePct={stats.pct} covered={stats.covered} total={stats.total} issues={validation.issues.length} people={stats.people} />
 
