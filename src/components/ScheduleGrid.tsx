@@ -46,17 +46,21 @@ interface Props {
   onMove?: (id: string, role: Role, beforeId: string | null) => void;
   /** Ask for a day off / holidays and re-plan the rest of the month around it (the app shows a preview first). */
   onPlan?: (staffId: string, date: string, kind: "D" | "V", days: number) => void;
+  /** Exchange shifts with another person on this day (optionally exchanging again on `returnDate`). */
+  onSwap?: (a: string, b: string, date: string, returnDate?: string) => void;
   /** Cells a pending plan would change ("staffId|date"), outlined in the grid. */
   preview?: Set<string>;
   readOnly?: boolean;
   today?: string | null;
 }
 
-export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, onCalendar, onMove, onPlan, preview, readOnly, today }: Props) {
+export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, onCalendar, onMove, onPlan, onSwap, preview, readOnly, today }: Props) {
   const dates = monthDates(year, month);
   const [menu, setMenu] = useState<{ staff: Staff; date: string; x: number; y: number } | null>(null);
   const [days, setDays] = useState(1);
   const [rebalance, setRebalance] = useState(true);
+  const [swapWith, setSwapWith] = useState("");
+  const [swapBack, setSwapBack] = useState("");
   const opener = useRef<HTMLElement | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLTableElement>(null);
@@ -142,6 +146,8 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
     const h = allowedShifts(person).length * 40 + 64;
     const y = r.bottom + h > window.innerHeight ? Math.max(4, r.top - h - 4) : r.bottom + 6;
     setDays(1);
+    setSwapWith("");
+    setSwapBack("");
     setMenu({ staff: person, date, x: Math.min(r.left, window.innerWidth - 232), y });
   };
 
@@ -410,6 +416,52 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
               />
               días
             </label>
+            {onSwap && (
+              <div className="mt-2 space-y-1.5 border-t border-line px-2 pt-2 text-xs text-muted">
+                <label className="flex items-center gap-2">
+                  Cambiar turno con
+                  <select
+                    value={swapWith}
+                    onChange={(e) => setSwapWith(e.target.value)}
+                    aria-label="Cambiar turno con"
+                    className="min-w-0 flex-1 rounded-lg border border-line bg-card-solid px-1.5 py-1 text-foreground"
+                  >
+                    <option value="">elegir…</option>
+                    {staff.filter((x) => x.id !== menu.staff.id).map((x) => (
+                      <option key={x.id} value={x.id}>{x.name}</option>
+                    ))}
+                  </select>
+                </label>
+                {swapWith && (
+                  <>
+                    <label className="flex items-center gap-2">
+                      Devolver el día
+                      <select
+                        value={swapBack}
+                        onChange={(e) => setSwapBack(e.target.value)}
+                        aria-label="Devolver el día"
+                        className="min-w-0 flex-1 rounded-lg border border-line bg-card-solid px-1.5 py-1 text-foreground"
+                      >
+                        <option value="">no (solo este día)</option>
+                        {dates.filter((x) => x > menu.date).map((x) => (
+                          <option key={x} value={x}>día {Number(x.slice(8))}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSwap(menu.staff.id, swapWith, menu.date, swapBack || undefined);
+                        closeMenu();
+                      }}
+                      className="w-full rounded-lg bg-brand/10 px-2 py-1.5 font-semibold text-brand transition hover:bg-brand/20"
+                    >
+                      Ver cambio
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
             {onPlan && (
               <label className="mt-1.5 flex cursor-pointer items-start gap-2 px-2 text-xs text-muted">
                 <input type="checkbox" checked={rebalance} onChange={(e) => setRebalance(e.target.checked)} className="mt-0.5 h-3.5 w-3.5" />

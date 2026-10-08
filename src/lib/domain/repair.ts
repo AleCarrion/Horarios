@@ -1,5 +1,5 @@
 import { generateOnce } from "./generator";
-import { monthDates, toISO } from "./dates";
+import { diffDays, monthDates, toISO } from "./dates";
 import { allowedShifts } from "./rules";
 import { isActive, isOff, type Schedule, type ShiftCode, type Staff, type Warning } from "./types";
 import { validateSchedule, type Issue } from "./validate";
@@ -15,6 +15,8 @@ export interface RepairContext {
   protectedDays?: number;
   /** Cells the manager locked: staffId -> date -> true. */
   locked?: Record<string, Record<string, boolean>>;
+  /** Recommended notice for a request, in days (default 30). Short notice is reported, never blocked. */
+  noticeDays?: number;
 }
 
 export interface CellChange {
@@ -35,6 +37,8 @@ export interface Plan {
   issues: Issue[];
   warnings: Warning[];
   reason?: string;
+  /** How far ahead of the earliest affected day the request was made (needs `today`). */
+  notice?: { daysAhead: number; short: boolean };
 }
 
 const HARD: Issue["kind"][] = ["coverage", "forbidden", "rest", "streak", "restStreak"];
@@ -53,6 +57,15 @@ const addDays = (iso: string, n: number) => {
 /** First day that may still be changed automatically (null = all of them). */
 export function firstEditable(ctx: Pick<RepairContext, "today" | "protectedDays">): string | null {
   return ctx.today ? addDays(ctx.today, (ctx.protectedDays ?? 2) + 1) : null;
+}
+
+const daysBetween = (a: string, b: string) => diffDays(b, a);
+
+/** Adds the notice information (only when we know today's date). */
+function withNotice(ctx: RepairContext, plan: Plan, firstDay: string): Plan {
+  if (!ctx.today) return plan;
+  const daysAhead = daysBetween(ctx.today, firstDay);
+  return { ...plan, notice: { daysAhead, short: daysAhead < (ctx.noticeDays ?? 30) } };
 }
 
 function diff(ctx: RepairContext, next: Schedule): CellChange[] {
@@ -222,6 +235,10 @@ function trySwap(ctx: RepairContext, who: string, date: string, known: Set<strin
  * A single libre day is first tried as a swap; otherwise a growing window around it is re-planned.
  */
 export function planDayOff(ctx: RepairContext, staffId: string, from: string, kind: "D" | "V" = "D", to: string = from): Plan {
+  return withNotice(ctx, planDayOffInner(ctx, staffId, from, kind, to), from);
+}
+
+function planDayOffInner(ctx: RepairContext, staffId: string, from: string, kind: "D" | "V", to: string): Plan {
   const person = ctx.staff.find((s) => s.id === staffId);
   const days = monthDates(ctx.year, ctx.month).filter((x) => x >= from && x <= to);
   const none = (level: Level, reason?: string): Plan => ({ level, strategy: "none", schedule: ctx.schedule, changes: [], issues: [], warnings: [], reason });
@@ -284,4 +301,76 @@ export function planRestructure(ctx: RepairContext, newStaff: Staff[], from: str
     warnings: cand.warnings,
     reason: reasonFor(cand.hard),
   };
+}
+
+/** Exchange the codes of two people on one day (a covers b's shift and b covers a's). */
+function exchange(schedule: Schedule, a: string, b: string, date: string): Schedule {
+  const next: Schedule = { ...schedule };
+  next[a] = { ...next[a], [date]: schedule[b][date] };
+  next[b] = { ...next[b], [date]: schedule[a][date] };
+  return next;
+}
+
+/**
+ * "Cambio de turno": two people exchange what they do on `date` (and optionally exchange again on `returnDate`).
+ * If one of them rests that day, it is a favour: the other covers and rests. Only the exchanged cells change when
+ * that keeps the month valid; otherwise a window around them is re-planned with the exchange pinned.
+ */
+export function planShiftSwap(ctx: RepairContext, a: string, b: string, date: string, returnDate?: string): Plan {
+  const days = [date, ...(returnDate ? [returnDate] : [])];
+  const none = (reason: string): Plan => withNotice(ctx, { level: "red", strategy: "none", schedule: ctx.schedule, changes: [], issues: [], warnings: [], reason }, date);
+  const pa = ctx.staff.find((s) => s.id === a);
+  const pb = ctx.staff.find((s) => s.id === b);
+  if (!pa || !pb || a === b) return none("Elige a dos personas distintas.");
+  const first = firstEditable(ctx);
+  for (const day of days) {
+    const ca = ctx.schedule[a]?.[day];
+    const cb = ctx.schedule[b]?.[day];
+    if (!ca || !cb) return none("Día no válido.");
+    if (first && day < first) return none(`El día ${Number(day.slice(8))} está protegido (pasado o de los próximos ${ctx.protectedDays ?? 2} días); no se cambia solo.`);
+    if (ctx.locked?.[a]?.[day] || ctx.locked?.[b]?.[day]) return none("Alguna de esas casillas está bloqueada.");
+    if (ca === "V" || cb === "V" || ca === "B" || cb === "B") return none("No se puede cambiar un día de vacaciones o fuera de plantilla.");
+    if (ca !== cb && (!allowedShifts(pa).includes(cb) || !allowedShifts(pb).includes(ca)))
+      return none(`${pa.name} y ${pb.name} no pueden intercambiar esos turnos: su puesto no lo permite.`);
+  }
+  if (days.every((x) => ctx.schedule[a][x] === ctx.schedule[b][x])) return withNotice(ctx, { level: "green", strategy: "none", schedule: ctx.schedule, changes: [], issues: [], warnings: [] }, date);
+
+  const known = baseIssueKeys(ctx);
+  let direct = ctx.schedule;
+  for (const day of days) direct = exchange(direct, a, b, day);
+  if (newHard(ctx, direct, known).length === 0)
+    return withNotice(ctx, { level: "green", strategy: "swap", schedule: direct, changes: diff(ctx, direct), issues: [], warnings: [] }, date);
+
+  // The plain exchange breaks a rule (e.g. a tarde followed by a mañana): re-plan around it with the exchange pinned.
+  const fixed = new Set<string>();
+  let best: Candidate | null = null;
+  for (const radius of RADII) {
+    const lo = radius === Infinity ? days[0] : addDays(days[0], -radius);
+    const hi = radius === Infinity ? "9999-12-31" : addDays(days.at(-1)!, radius);
+    const pinned = freeze(ctx, ctx.staff, lo, hi);
+    for (const day of days) {
+      (pinned[a] ??= {})[day] = direct[a][day];
+      (pinned[b] ??= {})[day] = direct[b][day];
+      fixed.add(`${a}|${day}`);
+      fixed.add(`${b}|${day}`);
+    }
+    const cand = replan(ctx, ctx.staff, pinned, known);
+    if (cand && (!best || cand.hard.length < best.hard.length)) best = cand;
+    if (best && best.hard.length === 0) break;
+  }
+  const cand = best!;
+  const lean = shrink(ctx, ctx.staff, cand.schedule, known, fixed);
+  return withNotice(
+    ctx,
+    {
+      level: levelOf(cand.hard, cand.warnings),
+      strategy: "window",
+      schedule: lean,
+      changes: diff(ctx, lean),
+      issues: cand.hard,
+      warnings: cand.warnings,
+      reason: reasonFor(cand.hard),
+    },
+    date,
+  );
 }

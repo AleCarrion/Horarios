@@ -12,7 +12,7 @@ import { activeInMonth, isActive, type Role, type Schedule, type ShiftCode, type
 import { validateSchedule } from "@/lib/domain/validate";
 import { MONTHS, SHIFT_STYLE } from "@/lib/ui";
 import { SHIFTS, displayCode } from "@/lib/domain/types";
-import { firstEditable, planDayOff, planRestructure, type Plan } from "@/lib/domain/repair";
+import { firstEditable, planDayOff, planRestructure, planShiftSwap, type Plan } from "@/lib/domain/repair";
 import { downloadText } from "@/lib/download";
 import { toCSV, toICS } from "@/lib/export";
 import { remoteConfigured } from "@/lib/supabase";
@@ -234,6 +234,15 @@ export function ScheduleApp() {
       title: `${label} · ${person?.name} · ${Number(from.slice(8))}${to !== from ? `–${Number(to.slice(8))}` : ""} ${MONTHS[ym.month - 1].toLowerCase()}`,
     });
   };
+  const requestSwap = (a: string, b: string, date: string, returnDate?: string) => {
+    const pa = staff.find((x) => x.id === a);
+    const pb = staff.find((x) => x.id === b);
+    const result = planShiftSwap({ year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined }, a, b, date, returnDate);
+    setPlan({
+      plan: result,
+      title: `Cambio de turno · ${pa?.name} ↔ ${pb?.name} · ${Number(date.slice(8))}${returnDate ? ` y ${Number(returnDate.slice(8))}` : ""} ${MONTHS[ym.month - 1].toLowerCase()}`,
+    });
+  };
   const applyPlan = () => {
     if (!plan) return;
     if (plan.team) saveTeam(plan.team);
@@ -340,6 +349,7 @@ export function ScheduleApp() {
             onCalendar={exportICS}
             onMove={readOnly ? undefined : onMovePerson}
             onPlan={readOnly ? undefined : requestDays}
+            onSwap={readOnly ? undefined : requestSwap}
             preview={previewCells}
           />
         )}

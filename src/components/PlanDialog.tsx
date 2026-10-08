@@ -52,6 +52,14 @@ export function PlanDialog({ plan, title, staff, onApply, onCancel }: Props) {
           </span>
         </p>
 
+        {plan.notice && (
+          <p className={`mt-2 rounded-lg px-3 py-1.5 text-xs ${plan.notice.short ? "bg-amber-400/20 text-amber-800 dark:text-amber-200" : "bg-brand/5 text-muted"}`}>
+            {plan.notice.daysAhead < 0
+              ? "Es un día ya pasado."
+              : `Pedido con ${plan.notice.daysAhead} día${plan.notice.daysAhead === 1 ? "" : "s"} de antelación${plan.notice.short ? " (lo recomendable es un mes; en una urgencia no queda otra)" : ""}.`}
+          </p>
+        )}
+
         {plan.changes.length === 0 ? (
           <p className="mt-3 text-sm text-muted">No hay que cambiar ninguna casilla.</p>
         ) : (
