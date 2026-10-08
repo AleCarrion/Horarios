@@ -5,7 +5,7 @@ import { generateSchedule } from "@/lib/domain/generator";
 import { applyEdits, applyRemote, createHistory, redo, undo, type Edit } from "@/lib/domain/history";
 import { DEFAULT_STAFF } from "@/lib/domain/roster";
 import { addStaff, changeRole, moveStaff, updateStaff } from "@/lib/domain/team";
-import { clearScheduleCache, lockedCount, nextStored, peekFor, prevMonth, readLocks, readStored, scheduleForAsync, setLocked, storageKey, writeLocks, type Locks } from "@/lib/monthStore";
+import { clearScheduleCache, historyFor, lockedCount, nextStored, scheduleFor, peekFor, prevMonth, readLocks, readStored, scheduleForAsync, setLocked, storageKey, writeLocks, type Locks } from "@/lib/monthStore";
 import { readRoster, writeRoster } from "@/lib/staffStore";
 import { useRemoteStaff } from "@/lib/useRemoteStaff";
 import { diffSchedules } from "@/lib/sync";
@@ -13,7 +13,9 @@ import { activeInMonth, isActive, type Role, type Schedule, type ShiftCode, type
 import { validateSchedule } from "@/lib/domain/validate";
 import { MONTHS, SHIFT_STYLE } from "@/lib/ui";
 import { SHIFTS, displayCode } from "@/lib/domain/types";
-import { firstEditable, planDayOff, planRestructure, planShiftSwap, type Plan } from "@/lib/domain/repair";
+import { firstEditable, planDayOff, planRestructure, planShiftSwap, type Plan, type RepairContext } from "@/lib/domain/repair";
+import { decide, KIND_LABEL, planForRequest, requestMonth, type ShiftRequest } from "@/lib/domain/requests";
+import { readRequests, writeRequests } from "@/lib/requestsStore";
 import { downloadText } from "@/lib/download";
 import { toCSV, toICS } from "@/lib/export";
 import { remoteConfigured } from "@/lib/supabase";
@@ -21,7 +23,8 @@ import { useAuth } from "@/lib/useAuth";
 import { useRemoteSchedule } from "@/lib/useRemoteSchedule";
 import { AuthBar } from "./AuthBar";
 import { ExportMenu } from "./ExportMenu";
-import { ChevronLeft, ChevronRight, CheckIcon, LockIcon, LogoMark, RedoIcon, SparklesIcon, UndoIcon } from "./icons";
+import { ChevronLeft, ChevronRight, CheckIcon, InboxIcon, LockIcon, LogoMark, RedoIcon, SparklesIcon, UndoIcon } from "./icons";
+import { RequestsPanel } from "./RequestsPanel";
 import { TeamPanel } from "./TeamPanel";
 import { PlanDialog } from "./PlanDialog";
 import { ScheduleGrid } from "./ScheduleGrid";
@@ -67,10 +70,13 @@ export function ScheduleApp() {
   const [staff, setStaff] = useState<Staff[]>(DEFAULT_STAFF);
   const [today, setToday] = useState<string | null>(null);
   const [locks, setLocks] = useState<Locks>({});
-  const [plan, setPlan] = useState<{ plan: Plan; title: string; team?: Staff[] } | null>(null);
+  const [plan, setPlan] = useState<{ plan: Plan; title: string; team?: Staff[]; request?: ShiftRequest } | null>(null);
+  const [requests, setRequests] = useState<ShiftRequest[]>([]);
+  const [panelOpen, setPanelOpen] = useState(false);
   useEffect(() => {
     // localStorage / the clock are only safe to read after mount
     setStaff(readRoster()); // eslint-disable-line react-hooks/set-state-in-effect
+    setRequests(readRequests());
     const t = new Date();
     setToday(`${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`);
   }, []);
@@ -271,6 +277,7 @@ export function ScheduleApp() {
   const applyPlan = () => {
     if (!plan) return;
     if (plan.team) saveTeam(plan.team);
+    if (plan.request) saveRequests(requests.map((x) => (x.id === plan.request!.id ? decide(x, "approved") : x)));
     dispatch({ type: "replace", schedule: plan.plan.schedule });
     if (plan.plan.pins.length) {
       // what was asked for (and approved) stays as decided
@@ -281,6 +288,40 @@ export function ScheduleApp() {
     setPlan(null);
   };
   const previewCells = useMemo(() => new Set(plan && !plan.team ? plan.plan.changes.map((c) => `${c.staffId}|${c.date}`) : []), [plan]);
+
+  // --- requests inbox: every request is planned on its own month and approved through the same preview
+  const saveRequests = (next: ShiftRequest[]) => {
+    setRequests(next);
+    writeRequests(next);
+  };
+  const ctxFor = (y: number, m: number): RepairContext => {
+    const current = y === ym.year && m === ym.month;
+    return {
+      year: y,
+      month: m,
+      staff,
+      schedule: current ? h.present : scheduleFor(y, m, staff),
+      today: today ?? undefined,
+      history: current ? history : historyFor(y, m, staff),
+      next: nextStored(y, m),
+      locked: current ? locks : readLocks(y, m),
+    };
+  };
+  // a new object whenever the schedule, locks, team or date change: the inbox recalculates its traffic lights
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const requestsVersion = useMemo(() => ({ present: h.present, locks, staff, today }), [h.present, locks, staff, today]);
+  const evaluateRequest = (r: ShiftRequest): Plan | null => {
+    const { year, month } = requestMonth(r);
+    return planForRequest(ctxFor(year, month), r);
+  };
+  const reviewRequest = (r: ShiftRequest, p: Plan) => {
+    const { year, month } = requestMonth(r);
+    setYm({ year, month }); // show the month the request is about
+    setPanelOpen(false);
+    const who = staff.find((x) => x.id === r.staffId)?.name;
+    setPlan({ plan: p, title: `${KIND_LABEL[r.kind]} · ${who} · ${Number(r.date.slice(8))}${r.endDate && r.endDate !== r.date ? `–${Number(r.endDate.slice(8))}` : ""} ${MONTHS[month - 1].toLowerCase()}`, request: r });
+  };
+  const rejectRequest = (r: ShiftRequest, note: string) => saveRequests(requests.map((x) => (x.id === r.id ? decide(x, "rejected", note) : x)));
 
   const changeLocks = (staffId: string, dates: string[], on: boolean) => {
     const next = setLocked(locks, dates.map((date) => ({ staffId, date })), on);
@@ -340,6 +381,19 @@ export function ScheduleApp() {
             </button>
             <button className={iconBtn} onClick={() => dispatch({ type: "redo" })} disabled={readOnly || !h.future.length} aria-label="Rehacer" title="Rehacer">
               <RedoIcon />
+            </button>
+            <button
+              onClick={() => setPanelOpen(true)}
+              aria-label={`Solicitudes (${requests.filter((r) => r.status === "pending").length} pendientes)`}
+              title="Solicitudes"
+              className={`${iconBtn} relative`}
+            >
+              <InboxIcon />
+              {requests.some((r) => r.status === "pending") && (
+                <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-[11px] font-bold text-white shadow">
+                  {requests.filter((r) => r.status === "pending").length}
+                </span>
+              )}
             </button>
             <ExportMenu onPdf={() => window.print()} onCsv={exportCSV} />
             {remote.draft && (
@@ -443,6 +497,18 @@ export function ScheduleApp() {
           onAdd={addPerson}
         />
       </main>
+      <RequestsPanel
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        requests={requests}
+        staff={staff}
+        evaluate={evaluateRequest}
+        onCreate={(rs) => saveRequests([...requests, ...rs])}
+        onReview={reviewRequest}
+        onReject={rejectRequest}
+        version={requestsVersion}
+        disabled={readOnly}
+      />
       {plan && <PlanDialog plan={plan.plan} title={plan.title} staff={plan.team ?? staff} onApply={applyPlan} onCancel={() => setPlan(null)} />}
     </>
   );

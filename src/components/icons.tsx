@@ -82,3 +82,9 @@ export const PlusIcon = (p: SVGProps<SVGSVGElement>) => (
 export const LockIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base({ strokeWidth: 2.5, ...p })}><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
 );
+export const InboxIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M4 13 6.5 5h11L20 13" /><path d="M4 13v6a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-6h-5l-1 2h-4l-1-2z" /></svg>
+);
+export const CloseIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M6 6l12 12M18 6 6 18" /></svg>
+);

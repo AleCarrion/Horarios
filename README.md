@@ -43,3 +43,11 @@ una vista previa antes de aplicarlo. Un libre solicitado es, siempre que se pued
 persona libra el día pedido y trabaja uno de sus descansos (4 casillas, mismo total de descansos). Si no basta,
 se recalcula una ventana creciente alrededor del día. Los días pasados y los próximos 2 días no se tocan solos.
 Lógica en `src/lib/domain/repair.ts` (con tests).
+
+## Solicitudes
+
+El botón de la bandeja (arriba a la derecha) abre las solicitudes: *libre*, *vacaciones* y *cambio de turno*
+de cualquier persona. Cada una se planifica con el motor sobre su mes y sale con semáforo (verde, ámbar,
+rojo con motivo), antelación (recomendado: un mes, solo informativo) y coincidencias con otras peticiones.
+"Revisar y aprobar" abre la vista previa de cambios; al aplicar, la solicitud queda aprobada y lo pedido
+bloqueado. Rechazar pide un motivo. De momento se guardan en el dispositivo; el siguiente paso es Supabase.
