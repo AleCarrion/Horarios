@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { isWeekend, monthDates, weekday } from "@/lib/domain/dates";
 import { isHoliday } from "@/lib/domain/holidays";
@@ -369,16 +370,17 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
         className="pointer-events-none fixed z-40 rounded-lg bg-slate-900/95 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-xl transition-opacity duration-150 print:hidden"
       />
 
-      {menu && (
+      {menu &&
+        createPortal(
         <>
-          <div className="fixed inset-0 z-20" onClick={closeMenu} aria-hidden="true" />
+          <div className="fixed inset-0 z-20 max-sm:bg-black/30" onClick={closeMenu} aria-hidden="true" />
           <div
             ref={menuRef}
             role="listbox"
             aria-label={`Turno de ${menu.staff.name}, ${menu.date}`}
             onKeyDown={onMenuKey}
             style={{ left: menu.x, top: menu.y }}
-            className="anim-menu fixed z-30 w-56 rounded-2xl border border-line bg-card-solid p-1.5 shadow-2xl max-sm:!inset-x-0 max-sm:!top-auto max-sm:!bottom-0 max-sm:!left-0 max-sm:max-h-[85vh] max-sm:w-full max-sm:overflow-y-auto max-sm:rounded-b-none max-sm:rounded-t-3xl max-sm:px-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] max-sm:animate-[sheet-up_0.22s_ease-out]"
+            className="anim-menu fixed z-30 w-56 rounded-2xl border border-line bg-card-solid p-1.5 shadow-2xl max-sm:!inset-0 max-sm:m-auto max-sm:h-fit max-sm:max-h-[calc(100dvh-8rem)] max-sm:w-[calc(100%-2rem)] max-sm:overflow-y-auto max-sm:px-3 max-sm:py-3"
           >
             <div className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-muted">
               {menu.staff.name} · {Number(menu.date.slice(8))}
@@ -500,7 +502,8 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
               </label>
             )}
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </div>
   );
