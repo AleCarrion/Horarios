@@ -38,6 +38,15 @@ export function PlanDialog({ plan, label, others = [], title, staff, onApply, on
   const worst: Level = sections.some((x) => x.plan.level === "red") ? "red" : sections.some((x) => x.plan.level === "amber") ? "amber" : "green";
   const { title: levelTitle, tone } = LEVEL[worst];
   const reasons = sections.filter((x) => x.plan.reason).map((x) => (x.label ? `${x.label}: ${x.plan.reason}` : x.plan.reason));
+  const callList = [
+    ...new Set(
+      sections
+        .filter((x) => x.plan.urgent)
+        .flatMap((x) => [...x.plan.changes].sort((a, b) => a.date.localeCompare(b.date)).map((c) => c.staffId))
+        .filter((id) => !sections.some((x) => x.plan.pins.some((p) => p.staffId === id)))
+        .map(name),
+    ),
+  ];
   const total = sections.reduce((n, x) => n + x.plan.changes.length, 0);
 
   return (
@@ -50,6 +59,12 @@ export function PlanDialog({ plan, label, others = [], title, staff, onApply, on
         className="anim-menu glass max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-card-solid p-5 shadow-2xl"
       >
         <h2 id="plan-title" className="text-lg font-bold">{title}</h2>
+        {sections.some((x) => x.plan.urgent) && callList.length > 0 && (
+          <p className="mt-3 rounded-xl bg-purple-500/15 px-3 py-2 text-sm font-semibold text-purple-800 dark:text-purple-200">
+            Hay que avisar a: {callList.join(", ")}
+            <span className="block font-normal">Son quienes cambian de turno para cubrir la ausencia (por orden de fecha).</span>
+          </p>
+        )}
         <p className={`mt-3 flex items-start gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${tone}`}>
           {worst === "green" ? <CheckIcon width={18} height={18} /> : <AlertIcon width={18} height={18} />}
           <span>

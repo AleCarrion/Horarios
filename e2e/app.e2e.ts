@@ -73,6 +73,19 @@ test("un archivo que no es una copia se rechaza con un mensaje claro", async ({ 
   await expect(page.getByRole("alertdialog")).toContainText("no es una copia de seguridad");
 });
 
+test("ausencia imprevista: la vista previa dice a quién avisar", async ({ page, viewport }) => {
+  test.skip((viewport?.width ?? 1280) < 640, "la cuadrícula completa es de escritorio");
+  await open(page);
+  const day = await lateDay(page);
+  await page.locator(`[data-row][data-col="${day}"]`).nth(3).click();
+  await page.getByRole("option", { name: /Ausencia/ }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Ausencia imprevista");
+  await expect(dialog).toContainText("Hay que avisar a");
+  await dialog.getByRole("button", { name: /Aplicar/ }).click();
+  await expect(page.locator(`[data-row][data-col="${day}"]`).nth(3)).toHaveAttribute("aria-label", /Ausencia/);
+});
+
 test("la página de equipo lista la plantilla", async ({ page }) => {
   await page.goto("/equipo");
   await expect(page.getByRole("heading", { name: "Equipo" })).toBeVisible();

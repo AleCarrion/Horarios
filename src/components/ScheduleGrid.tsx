@@ -47,7 +47,7 @@ interface Props {
   /** Drag a person to reorder them or drop them in another section (changes their puesto). */
   onMove?: (id: string, role: Role, beforeId: string | null) => void;
   /** Ask for a day off / holidays and re-plan the rest of the month around it (the app shows a preview first). */
-  onPlan?: (staffId: string, date: string, kind: "D" | "V" | "M" | "T" | "N", days: number) => void;
+  onPlan?: (staffId: string, date: string, kind: "D" | "V" | "A" | "M" | "T" | "N", days: number) => void;
   /** Exchange shifts with another person on this day (optionally exchanging again on `returnDate`). */
   onSwap?: (a: string, b: string, date: string, returnDate?: string) => void;
   /** Locked cells (staffId -> date -> true) and the action to lock/unlock a range of days. */
@@ -397,7 +397,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                     // Apply to `days` consecutive days from the clicked one (e.g. 14 days of vacation).
                     const start = dates.indexOf(menu.date);
                     const range = dates.slice(start, start + days);
-                    if (rebalance && onPlan && (c === "D" || c === "V" || c === "M" || c === "T" || c === "N")) onPlan(menu.staff.id, range[0], c, range.length);
+                    if (rebalance && onPlan && (c === "D" || c === "V" || c === "A" || c === "M" || c === "T" || c === "N")) onPlan(menu.staff.id, range[0], c, range.length);
                     else onEdit(range.map((date) => ({ staffId: menu.staff.id, date, to: c })));
                     closeMenu();
                   }}
@@ -497,7 +497,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
               <label className="mt-1.5 flex cursor-pointer items-start gap-2 px-2 text-xs text-muted">
                 <input type="checkbox" checked={rebalance} onChange={(e) => setRebalance(e.target.checked)} className="mt-0.5 h-3.5 w-3.5" />
                 <span>
-                  Al elegir <b>Libre</b>, <b>Vacaciones</b> o un turno, reajustar el resto del horario
+                  Al elegir <b>Libre</b>, <b>Vacaciones</b>, <b>Ausencia</b> o un turno, reajustar el resto del horario
                 </span>
               </label>
             )}

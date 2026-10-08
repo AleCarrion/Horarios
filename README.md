@@ -17,7 +17,7 @@ npm test           # generador, validación, exportación, sincronización
 
 ## Configurar Supabase
 
-1. Crea un proyecto y ejecuta, por este orden, `supabase/migrations/0001_init.sql`, `supabase/migrations/0002_staff_order.sql`, `supabase/migrations/0003_requests_locks.sql`, `supabase/migrations/0004_request_shift.sql` y `supabase/seed.sql` (SQL editor).
+1. Crea un proyecto y ejecuta, por este orden, `supabase/migrations/0001_init.sql`, `supabase/migrations/0002_staff_order.sql`, `supabase/migrations/0003_requests_locks.sql`, `supabase/migrations/0004_request_shift.sql`, `supabase/migrations/0005_absence_shift.sql` y `supabase/seed.sql` (SQL editor).
 2. En *Authentication → URL configuration* añade la URL de la app (y `http://localhost:3000`) como redirect.
 3. Copia `.env.example` a `.env.local` y rellena la URL y la clave *anon*.
 4. Inicia sesión una vez con el correo de la jefa (enlace mágico) y ejecuta en el SQL editor:

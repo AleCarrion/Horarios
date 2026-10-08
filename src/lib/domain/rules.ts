@@ -10,5 +10,5 @@ const BASE: Record<Role, ShiftCode[]> = {
 
 /** Shifts a person may be assigned: their role's shifts plus any `extraShifts` (e.g. Julio covers M/T). */
 export function allowedShifts(s: Staff): ShiftCode[] {
-  return [...new Set([...BASE[s.role], ...(s.extraShifts ?? []), "V", "B"] as ShiftCode[])];
+  return [...new Set([...BASE[s.role], ...(s.extraShifts ?? []), "V", "A", "B"] as ShiftCode[])];
 }

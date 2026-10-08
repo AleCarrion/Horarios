@@ -7,6 +7,7 @@ insert into public.shifts (code, label, start_time, end_time, color) values
   ('MZ','Mozo','11:00','19:00','#65a30d'),
   ('D','Libre',null,null,'#92d050'),
   ('V','Vacaciones',null,null,'#ff0000'),
+  ('A','Ausencia / baja',null,null,'#7030a0'),
   ('B','Fuera de plantilla',null,null,'#000000')
 on conflict (code) do nothing;
 

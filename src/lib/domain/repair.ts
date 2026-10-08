@@ -43,6 +43,8 @@ export interface Plan {
   reason?: string;
   /** Cells to lock once the plan is applied: what was asked for, so a later re-plan does not undo it. */
   pins: { staffId: string; date: string }[];
+  /** An emergency change (absence): no notice period; the screen lists the people to call. */
+  urgent?: boolean;
   /** How far ahead of the earliest affected day the request was made (needs `today`). */
   notice?: { daysAhead: number; short: boolean };
 }
@@ -260,12 +262,24 @@ export function planDayOff(ctx: RepairContext, staffId: string, from: string, ki
   return withNotice(ctx, planDayOffInner(ctx, staffId, from, kind, to), from);
 }
 
+/**
+ * "Hoy no viene X" (baja médica, imprevisto): the person is absent from `from` to `to` (code "A").
+ * It is an emergency, so there is no notice period and the protected days do not apply: only the days before today are untouchable.
+ * `plan.urgent` is set so the screen can say who to call.
+ */
+export function planAbsence(ctx: RepairContext, staffId: string, from: string, to: string = from): Plan {
+  const today = ctx.today;
+  const start = today && from < today ? today : from;
+  const plan = planDayOffInner({ ...ctx, protectedDays: -1 }, staffId, start, "A", to < start ? start : to);
+  return { ...plan, urgent: true };
+}
+
 /** "Quiero mañanas esos días": the person asks to work a given shift (M, T or N) on a range of days. */
 export function planShiftPref(ctx: RepairContext, staffId: string, from: string, to: string, code: "M" | "T" | "N"): Plan {
   return withNotice(ctx, planDayOffInner(ctx, staffId, from, code, to), from);
 }
 
-function planDayOffInner(ctx: RepairContext, staffId: string, from: string, kind: "D" | "V" | "M" | "T" | "N", to: string): Plan {
+function planDayOffInner(ctx: RepairContext, staffId: string, from: string, kind: "D" | "V" | "A" | "M" | "T" | "N", to: string): Plan {
   const person = ctx.staff.find((s) => s.id === staffId);
   const days = monthDates(ctx.year, ctx.month).filter((x) => x >= from && x <= to);
   const none = (level: Level, reason?: string): Plan => ({ level, strategy: "none", schedule: ctx.schedule, changes: [], issues: [], warnings: [], pins: [], reason });
@@ -277,7 +291,7 @@ function planDayOffInner(ctx: RepairContext, staffId: string, from: string, kind
   if (work && days.some((x) => !isActive(person, x))) return none("red", `${person.name} no está en plantilla alguno de esos días.`);
   const alreadyOff = work
     ? days.every((x) => ctx.schedule[staffId]?.[x] === kind)
-    : days.every((x) => isOff(ctx.schedule[staffId]?.[x]) && (kind === "D" || ctx.schedule[staffId][x] === "V"));
+    : days.every((x) => isOff(ctx.schedule[staffId]?.[x]) && (kind === "D" || ctx.schedule[staffId][x] === kind));
   if (alreadyOff) return none("green");
   if (first && days.some((x) => x < first && ctx.schedule[staffId]?.[x] !== kind))
     return none("red", `Esos días están protegidos (pasados o de los próximos ${ctx.protectedDays ?? 2} días); no se cambian solos.`);
@@ -397,7 +411,7 @@ export function planShiftSwap(ctx: RepairContext, a: string, b: string, date: st
     if (!ca || !cb) return none("Día no válido.");
     if (first && day < first) return none(`El día ${Number(day.slice(8))} está protegido (pasado o de los próximos ${ctx.protectedDays ?? 2} días); no se cambia solo.`);
     if (ctx.locked?.[a]?.[day] || ctx.locked?.[b]?.[day]) return none("Alguna de esas casillas está bloqueada.");
-    if (ca === "V" || cb === "V" || ca === "B" || cb === "B") return none("No se puede cambiar un día de vacaciones o fuera de plantilla.");
+    if (ca === "V" || cb === "V" || ca === "A" || cb === "A" || ca === "B" || cb === "B") return none("No se puede cambiar un día de vacaciones, ausencia o fuera de plantilla.");
     if (ca !== cb && (!allowedShifts(pa).includes(cb) || !allowedShifts(pb).includes(ca)))
       return none(`${pa.name} y ${pb.name} no pueden intercambiar esos turnos: su puesto no lo permite.`);
   }

@@ -114,11 +114,11 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
   };
   const pin = (id: string, d: string) => config.pinned?.[id]?.[d];
   /** "V" (holiday), "B" (not employed: outside alta/baja or marked by hand) or "D" (pinned libre); undefined when the person may work. */
-  const offCode = (id: string, d: string): "V" | "B" | "D" | undefined => {
+  const offCode = (id: string, d: string): "V" | "A" | "B" | "D" | undefined => {
     const person = byId.get(id);
     if (person && !isActive(person, d)) return "B";
     const p = pin(id, d);
-    if (p === "V" || p === "B" || p === "D") return p;
+    if (p === "V" || p === "A" || p === "B" || p === "D") return p;
     return config.unavailable?.[id]?.[d];
   };
   /** A pinned working shift (e.g. a frozen "T"), if any. */
@@ -351,7 +351,7 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
       s.dRun = code === "D" ? s.dRun + 1 : 0; // holidays (V/B) do not count towards the 3-day rest limit
       // Holidays and days before an alta count as "worked" for fairness, so nobody has to catch up after them
       // (a new hire or someone back from holiday does not absorb everyone else's shifts).
-      if (code === "V" || code === "B") s.worked++;
+      if (code === "V" || code === "A" || code === "B") s.worked++;
       if (isOff(code)) {
         s.streak = 0;
         s.blockLen = 0;
@@ -382,7 +382,7 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
     stats[s.id] = {
       worked: vals.filter((v) => !isOff(v)).length,
       rest: vals.filter((v) => v === "D").length,
-      off: vals.filter((v) => v === "V" || v === "B").length,
+      off: vals.filter((v) => v === "V" || v === "A" || v === "B").length,
       M: vals.filter((v) => v === "M").length,
       T: vals.filter((v) => v === "T").length,
       N: vals.filter((v) => v === "N").length,

@@ -1,5 +1,5 @@
 /** V = vacaciones, B = fuera de plantilla (not employed that day). Both count as non-working. */
-export type ShiftCode = "M" | "T" | "N" | "S" | "P" | "MZ" | "D" | "V" | "B";
+export type ShiftCode = "M" | "T" | "N" | "S" | "P" | "MZ" | "D" | "V" | "A" | "B";
 
 export type Role = "night_auditor" | "director" | "senior" | "receptionist" | "mozo";
 
@@ -35,6 +35,7 @@ export const SHIFTS: Record<ShiftCode, ShiftDef> = {
   MZ: { code: "MZ", label: "Mozo", start: "11:00", end: "19:00" },
   D: { code: "D", label: "Libre", start: "", end: "" },
   V: { code: "V", label: "Vacaciones", start: "", end: "" },
+  A: { code: "A", label: "Ausencia / baja", start: "", end: "" },
   B: { code: "B", label: "Fuera de plantilla", start: "", end: "" },
 };
 
@@ -73,7 +74,7 @@ export interface GeneratorConfig {
   /** How strongly to prefer the baseline (default 80). Higher values change fewer cells but may break block rotation. */
   baselineKeep?: number;
   /** Fixed non-working days per staff id: "V" vacation or "B" not employed that day. Cover is planned around them. */
-  unavailable?: Record<string, Record<string, "V" | "B">>;
+  unavailable?: Record<string, Record<string, "V" | "A" | "B">>;
   seed?: number;
 }
 
@@ -92,11 +93,11 @@ export interface GeneratorResult {
 }
 
 /** Letter shown to users, matching the hotel's Excel: L for libre, P for the mozo shift. */
-export const DISPLAY_CODE: Record<ShiftCode, string> = { M: "M", T: "T", N: "N", S: "S", P: "P", MZ: "P", D: "L", V: "V", B: "" };
+export const DISPLAY_CODE: Record<ShiftCode, string> = { M: "M", T: "T", N: "N", S: "S", P: "P", MZ: "P", D: "L", V: "V", A: "A", B: "" };
 export const displayCode = (c: ShiftCode) => DISPLAY_CODE[c];
 
 /** True for any day without work (libre, vacaciones, fuera de plantilla). */
-export const isOff = (c: ShiftCode | undefined) => !c || c === "D" || c === "V" || c === "B";
+export const isOff = (c: ShiftCode | undefined) => !c || c === "D" || c === "V" || c === "A" || c === "B";
 
 /** Whether the person is on the roster on that day (alta/baja dates). */
 export const isActive = (s: Pick<Staff, "activeFrom" | "activeTo">, date: string) =>

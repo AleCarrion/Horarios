@@ -10,6 +10,7 @@ export const SHIFT_STYLE: Record<ShiftCode, string> = {
   MZ: "bg-[#00b0f0] text-black",
   D: "bg-[#92d050] text-black",
   V: "bg-[#ff0000] text-black",
+  A: "bg-[#7030a0] text-white",
   B: "bg-black text-black",
 };
 

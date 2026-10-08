@@ -17,7 +17,7 @@ import { activeInMonth, isActive, type Role, type Schedule, type ShiftCode, type
 import { validateSchedule } from "@/lib/domain/validate";
 import { MONTHS, SHIFT_STYLE } from "@/lib/ui";
 import { SHIFTS, displayCode } from "@/lib/domain/types";
-import { planDayOff, planFix, planShiftPref, planShiftSwap, type Plan, type RepairContext } from "@/lib/domain/repair";
+import { planAbsence, planDayOff, planFix, planShiftPref, planShiftSwap, type Plan, type RepairContext } from "@/lib/domain/repair";
 import { decide, KIND_LABEL, planForRequest, requestMonth, type ShiftRequest } from "@/lib/domain/requests";
 import { readRequests, writeRequests } from "@/lib/requestsStore";
 import { downloadText } from "@/lib/download";
@@ -180,12 +180,12 @@ export function ScheduleApp() {
   const regenerate = (list: Staff[] = staff) => {
     try { localStorage.removeItem(storageKey(ym.year, ym.month)); clearScheduleCache(); } catch {}
     // Holidays (V), days out of the roster (B) and JC's rest days are inputs: edit them in the grid, then regenerate around them.
-    const unavailable: Record<string, Record<string, "V" | "B">> = {};
+    const unavailable: Record<string, Record<string, "V" | "A" | "B">> = {};
     for (const p of list) {
       const before = staff.find((x) => x.id === p.id); // dates as they were: a B outside them came from the old dates, not from a hand edit
       for (const [d, c] of Object.entries(h.present[p.id] ?? {})) {
         if (c === "B" && before && !isActive(before, d)) continue;
-        if (c === "V" || c === "B") (unavailable[p.id] ??= {})[d] = c;
+        if (c === "V" || c === "A" || c === "B") (unavailable[p.id] ??= {})[d] = c;
       }
     }
     const night = list.find((p) => p.role === "night_auditor");
@@ -227,13 +227,13 @@ export function ScheduleApp() {
   };
 
   // --- day off / holidays requests: plan the whole month around them and show a preview first
-  const requestDays = (staffId: string, from: string, kind: "D" | "V" | "M" | "T" | "N", days: number) => {
+  const requestDays = (staffId: string, from: string, kind: "D" | "V" | "A" | "M" | "T" | "N", days: number) => {
     const person = staff.find((x) => x.id === staffId);
     const all = Object.keys(h.present[staffId] ?? {}).sort();
     const to = all[Math.min(all.indexOf(from) + days - 1, all.length - 1)] ?? from;
     const ctx = { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: locks };
-    const result = kind === "M" || kind === "T" || kind === "N" ? planShiftPref(ctx, staffId, from, to, kind) : planDayOff(ctx, staffId, from, kind, to);
-    const label = kind === "V" ? "Vacaciones" : kind === "D" ? "Libre solicitado" : `Turno pedido (${{ M: "mañanas", T: "tardes", N: "noches" }[kind]})`;
+    const result = kind === "M" || kind === "T" || kind === "N" ? planShiftPref(ctx, staffId, from, to, kind) : kind === "A" ? planAbsence(ctx, staffId, from, to) : planDayOff(ctx, staffId, from, kind, to);
+    const label = kind === "V" ? "Vacaciones" : kind === "A" ? "Ausencia imprevista" : kind === "D" ? "Libre solicitado" : `Turno pedido (${{ M: "mañanas", T: "tardes", N: "noches" }[kind]})`;
     setPlan({
       plan: result,
       title: `${label} · ${person?.name} · ${Number(from.slice(8))}${to !== from ? `–${Number(to.slice(8))}` : ""} ${MONTHS[ym.month - 1].toLowerCase()}`,
@@ -487,7 +487,7 @@ export function ScheduleApp() {
         </h2>
 
         <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 text-xs sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 print:hidden" aria-label="Leyenda">
-          {(["M", "T", "N", "S", "P", "MZ", "D", "V"] as const).map((c) => (
+          {(["M", "T", "N", "S", "P", "MZ", "D", "V", "A"] as const).map((c) => (
             <li key={c} className="glass flex shrink-0 items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2.5 text-xs font-medium sm:gap-2 sm:py-1 sm:pl-1 sm:pr-3 transition hover:-translate-y-0.5 hover:shadow-md">
               <span className={`grid h-6 w-7 place-items-center rounded-full text-[11px] font-bold ${SHIFT_STYLE[c]}`}>{displayCode(c)}</span>
               {SHIFTS[c].label}
