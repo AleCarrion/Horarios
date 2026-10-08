@@ -1,6 +1,6 @@
 import { validateSchedule } from "./validate";
 import { diffDays, isWeekend, monthDates } from "./dates";
-import { isOff, type GeneratorConfig, type GeneratorResult, type Schedule, type ShiftCode, type Staff, type Warning } from "./types";
+import { isActive, isOff, type GeneratorConfig, type GeneratorResult, type Schedule, type ShiftCode, type Staff, type Warning } from "./types";
 
 /** Extra "workload days" a covering senior counts as having, so receptionists are preferred but seniors still share M/T. */
 const SENIOR_PENALTY = 100;
@@ -67,8 +67,13 @@ function generateOnce(config: GeneratorConfig): GeneratorResult {
     schedule[id][d] = c;
   };
 
-  /** "V"/"B" if the person is on holiday / not employed that day. */
-  const offCode = (id: string, d: string) => config.unavailable?.[id]?.[d];
+  const byId = new Map(staff.map((x) => [x.id, x]));
+  /** "V" (holiday) or "B" (not employed: before their alta / after their baja, or marked by hand). */
+  const offCode = (id: string, d: string) => {
+    const person = byId.get(id);
+    if (person && !isActive(person, d)) return "B" as const;
+    return config.unavailable?.[id]?.[d];
+  };
 
   const jcRest = new Set(
     config.jcRestDays ?? autoJcRestDays(dates, config.jcRestCount ?? 10),

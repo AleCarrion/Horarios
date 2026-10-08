@@ -4,7 +4,9 @@ import { useEffect, useMemo, useReducer, useState } from "react";
 import { generateSchedule } from "@/lib/domain/generator";
 import { applyEdits, applyRemote, createHistory, redo, undo, type Edit } from "@/lib/domain/history";
 import { DEFAULT_STAFF, EXTRA_RECEPTIONIST } from "@/lib/domain/roster";
-import type { Schedule, ShiftCode, Staff } from "@/lib/domain/types";
+import { buildStaff, readOverrides, writeOverrides, type RosterOverrides } from "@/lib/rosterConfig";
+import { diffSchedules } from "@/lib/sync";
+import { isActive, type Schedule, type ShiftCode, type Staff } from "@/lib/domain/types";
 import { validateSchedule } from "@/lib/domain/validate";
 import { MONTHS, SHIFT_STYLE } from "@/lib/ui";
 import { SHIFTS, displayCode } from "@/lib/domain/types";
@@ -14,12 +16,14 @@ import { remoteConfigured } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
 import { useRemoteSchedule } from "@/lib/useRemoteSchedule";
 import { AuthBar } from "./AuthBar";
+import { RosterPanel } from "./RosterPanel";
 import { ScheduleGrid } from "./ScheduleGrid";
 
 type Action =
   | { type: "reset"; schedule: Schedule }
   | { type: "edit"; edits: Edit[] }
   | { type: "remote"; staffId: string; date: string; code: ShiftCode }
+  | { type: "replace"; schedule: Schedule }
   | { type: "undo" }
   | { type: "redo" };
 
@@ -28,6 +32,12 @@ function reducer(h: ReturnType<typeof createHistory>, a: Action) {
     case "reset": return createHistory(a.schedule);
     case "edit": return applyEdits(h, a.edits);
     case "remote": return applyRemote(h, a.staffId, a.date, a.code);
+    case "replace": {
+      // Same people: apply as one undoable step. Different rows (e.g. refuerzo toggled): start fresh.
+      const sameRows = Object.keys(a.schedule).length === Object.keys(h.present).length && Object.keys(a.schedule).every((k) => k in h.present);
+      if (!sameRows) return createHistory(a.schedule);
+      return applyEdits(h, diffSchedules(h.present, a.schedule).map((r) => ({ staffId: r.staff_id, date: r.day, to: r.shift_code })));
+    }
     case "undo": return undo(h);
     case "redo": return redo(h);
   }
@@ -40,7 +50,7 @@ function load(y: number, m: number): Schedule {
     const raw = localStorage.getItem(storageKey(y, m));
     if (raw) return JSON.parse(raw) as Schedule;
   } catch {}
-  return generateSchedule({ year: y, month: m, staff: DEFAULT_STAFF }).schedule;
+  return generateSchedule({ year: y, month: m, staff: buildStaff(false, readOverrides()) }).schedule;
 }
 
 export function ScheduleApp() {
@@ -53,11 +63,12 @@ export function ScheduleApp() {
 
   // The temporary receptionist is part of the month only when her row exists in the schedule.
   const hasExtra = Boolean(h.present[EXTRA_RECEPTIONIST.id]);
-  const staff = useMemo<Staff[]>(() => {
-    if (!hasExtra) return DEFAULT_STAFF;
-    const i = DEFAULT_STAFF.findIndex((x) => x.id === "marcos") + 1;
-    return [...DEFAULT_STAFF.slice(0, i), EXTRA_RECEPTIONIST, ...DEFAULT_STAFF.slice(i)];
-  }, [hasExtra]);
+  const [overrides, setOverrides] = useState<RosterOverrides>({});
+  useEffect(() => {
+    // localStorage is only available after mount
+    setOverrides(readOverrides()); // eslint-disable-line react-hooks/set-state-in-effect
+  }, []);
+  const staff = useMemo<Staff[]>(() => buildStaff(hasExtra, overrides), [hasExtra, overrides]);
 
   const auth = useAuth();
   const remote = useRemoteSchedule({
@@ -90,18 +101,20 @@ export function ScheduleApp() {
       return { year: d.getFullYear(), month: d.getMonth() + 1 };
     });
 
-  const regenerate = (withExtra = hasExtra) => {
+  const regenerate = (withExtra = hasExtra, ov: RosterOverrides = overrides) => {
     try { localStorage.removeItem(storageKey(ym.year, ym.month)); } catch {}
-    const list = withExtra
-      ? [...DEFAULT_STAFF.slice(0, 7), EXTRA_RECEPTIONIST, ...DEFAULT_STAFF.slice(7)]
-      : DEFAULT_STAFF;
+    const list = buildStaff(withExtra, ov);
     // Holidays (V), days out of the roster (B) and JC's rest days are inputs: edit them in the grid, then regenerate around them.
     const unavailable: Record<string, Record<string, "V" | "B">> = {};
-    for (const p of list)
-      for (const [d, c] of Object.entries(h.present[p.id] ?? {}))
+    for (const p of list) {
+      const before = staff.find((x) => x.id === p.id); // dates as they were: a B outside them came from the old dates, not from a hand edit
+      for (const [d, c] of Object.entries(h.present[p.id] ?? {})) {
+        if (c === "B" && before && !isActive(before, d)) continue;
         if (c === "V" || c === "B") (unavailable[p.id] ??= {})[d] = c;
+      }
+    }
     dispatch({
-      type: "reset",
+      type: "replace",
       schedule: generateSchedule({
         year: ym.year,
         month: ym.month,
@@ -111,6 +124,13 @@ export function ScheduleApp() {
         jcRestDays: Object.entries(h.present.jc ?? {}).filter(([, c]) => c === "D").map(([d]) => d),
       }).schedule,
     });
+  };
+
+  const changeDates = (id: string, field: "activeFrom" | "activeTo", value: string) => {
+    const next = { ...overrides, [id]: { ...overrides[id], [field]: value || undefined } };
+    setOverrides(next);
+    writeOverrides(next);
+    regenerate(hasExtra, next);
   };
 
   const fileBase = `horario-${ym.year}-${String(ym.month).padStart(2, "0")}`;
@@ -180,6 +200,8 @@ export function ScheduleApp() {
         />
         Recepcionista de refuerzo ({EXTRA_RECEPTIONIST.name}) para cubrir vacaciones
       </label>
+
+      <RosterPanel staff={staff} overrides={overrides} disabled={readOnly} onChange={changeDates} />
 
       <ul className="flex flex-wrap gap-2 text-xs" aria-label="Leyenda">
         {(["M", "T", "N", "S", "P", "MZ", "D", "V"] as const).map((c) => (

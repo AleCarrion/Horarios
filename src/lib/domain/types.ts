@@ -9,6 +9,10 @@ export interface Staff {
   role: Role;
   /** Mozos: first day (YYYY-MM-DD) of any 5-work block; the 5-5 cycle is derived from it. */
   cycleAnchor?: string;
+  /** First day (YYYY-MM-DD, inclusive) the person is on the roster; earlier days are "B" (fuera de plantilla). */
+  activeFrom?: string;
+  /** Last day (inclusive) the person is on the roster; later days are "B". */
+  activeTo?: string;
   /** Seniors only: extra shifts they can cover besides P (e.g. ["M", "T"]). */
   extraShifts?: ShiftCode[];
   /** Seniors only: max M/T covers per month (defaults to config.maxSeniorMornings). */
@@ -80,3 +84,7 @@ export const displayCode = (c: ShiftCode) => DISPLAY_CODE[c];
 
 /** True for any day without work (libre, vacaciones, fuera de plantilla). */
 export const isOff = (c: ShiftCode | undefined) => !c || c === "D" || c === "V" || c === "B";
+
+/** Whether the person is on the roster on that day (alta/baja dates). */
+export const isActive = (s: Pick<Staff, "activeFrom" | "activeTo">, date: string) =>
+  (!s.activeFrom || date >= s.activeFrom) && (!s.activeTo || date <= s.activeTo);
