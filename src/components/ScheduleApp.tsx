@@ -28,6 +28,7 @@ import { ExportMenu } from "./ExportMenu";
 import { ChevronLeft, ChevronRight, CheckIcon, InboxIcon, LockIcon, LogoMark, RedoIcon, SparklesIcon, UndoIcon } from "./icons";
 import { RequestsPanel } from "./RequestsPanel";
 import { TeamPanel } from "./TeamPanel";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { PlanDialog } from "./PlanDialog";
 import { ScheduleGrid } from "./ScheduleGrid";
 import { StatCards } from "./StatCards";
@@ -75,6 +76,7 @@ export function ScheduleApp() {
   const [plan, setPlan] = useState<{ plan: Plan; title: string; team?: Staff[]; request?: ShiftRequest } | null>(null);
   const [requests, setRequests] = useState<ShiftRequest[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   useEffect(() => {
     // localStorage / the clock are only safe to read after mount
     setStaff(readRoster()); // eslint-disable-line react-hooks/set-state-in-effect
@@ -426,7 +428,7 @@ export function ScheduleApp() {
             )}
             <button
               disabled={readOnly}
-              onClick={() => regenerate()}
+              onClick={() => setConfirmRegenerate(true)}
               className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-accent to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-accent/30 transition hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:scale-95 disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
             >
               <SparklesIcon width={16} height={16} className="transition-transform group-hover:rotate-12 group-hover:scale-125" />
@@ -529,6 +531,25 @@ export function ScheduleApp() {
         version={requestsVersion}
         disabled={readOnly}
       />
+      {confirmRegenerate && (
+        <ConfirmDialog
+          title="¿Seguro que quieres continuar?"
+          confirmLabel="Sí, rehacer el calendario"
+          onCancel={() => setConfirmRegenerate(false)}
+          onConfirm={() => {
+            setConfirmRegenerate(false);
+            regenerate();
+          }}
+        >
+          <p>Vas a rehacer el calendario de {MONTHS[ym.month - 1].toLowerCase()}: tu calendario puede sufrir cambios.</p>
+          <p className="mt-2">
+            {lockedCount(locks) > 0
+              ? `Las ${lockedCount(locks)} casillas bloqueadas, las vacaciones y los días fuera de plantilla se mantienen. `
+              : "Las vacaciones y los días fuera de plantilla se mantienen. "}
+            Podrás deshacerlo con el botón Deshacer.
+          </p>
+        </ConfirmDialog>
+      )}
       {plan && <PlanDialog plan={plan.plan} title={plan.title} staff={plan.team ?? staff} onApply={applyPlan} onCancel={() => setPlan(null)} />}
     </>
   );
