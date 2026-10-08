@@ -92,6 +92,10 @@ export function PlanDialog({ plan, title, staff, onApply, onCancel }: Props) {
           </>
         )}
 
+        {plan.pins.length > 0 && (
+          <p className="mt-3 text-xs text-muted">Al aplicar, lo pedido queda bloqueado para que un reajuste posterior no lo deshaga.</p>
+        )}
+
         <div className="mt-5 flex justify-end gap-2">
           <button onClick={onCancel} className="rounded-xl border border-line px-4 py-2 text-sm font-semibold transition hover:bg-brand/10 focus-visible:outline-2 focus-visible:outline-brand">
             Cancelar

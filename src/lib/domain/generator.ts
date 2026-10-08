@@ -1,5 +1,6 @@
+import { holidaysOf } from "./holidays";
 import { validateSchedule } from "./validate";
-import { diffDays, isWeekend, monthDates } from "./dates";
+import { diffDays, isWeekend, monthDates, toISO } from "./dates";
 import { isActive, isOff, type GeneratorConfig, type GeneratorResult, type Schedule, type ShiftCode, type Staff, type Warning } from "./types";
 
 /** Extra "workload days" a covering senior counts as having, so receptionists are preferred but seniors still share M/T. */
@@ -14,6 +15,12 @@ const LEGAL_STREAK = 6;
 const MAX_REST_RUN = 3;
 /** When repairing a schedule, how much the planner prefers keeping someone on the shift they already had. */
 const BASELINE_KEEP = 80;
+
+const addDaysIso = (iso: string, n: number) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + n));
+  return toISO(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate());
+};
 
 /** Spread `count` rest days in blocks of two, evenly through the month. */
 export function autoJcRestDays(dates: string[], count: number, startStreak = 0): string[] {
@@ -88,6 +95,7 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
   };
 
   const byId = new Map(staff.map((x) => [x.id, x]));
+  const holidays = holidaysOf(year, config.extraHolidays);
 
   /** What a person was doing right before day 1 (from the previous month), to carry streaks and blocks over. */
   const tail = (id: string) => {
@@ -137,10 +145,19 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
   for (const jc of byRole("night_auditor"))
     for (const d of dates) set(jc.id, d, offCode(jc.id, d) ?? (jcRest.has(d) ? "D" : "N"));
   for (const m of byRole("director"))
-    for (const d of dates) set(m.id, d, offCode(m.id, d) ?? pinnedWork(m.id, d) ?? (isWeekend(d) ? "D" : "S"));
-  for (const mz of byRole("mozo")) {
+    for (const d of dates) set(m.id, d, offCode(m.id, d) ?? pinnedWork(m.id, d) ?? (isWeekend(d) || holidays.has(d) ? "D" : "S"));
+  // A mozo with an alta date starts working that very day (first 5 of the 5-5 cycle); a second one starts 5 days later in the cycle.
+  const mozos = byRole("mozo");
+  const withAlta = mozos.filter((x) => x.activeFrom);
+  const firstAlta = withAlta.map((x) => x.activeFrom!).sort()[0];
+  const anchorOf = (mz: Staff) => {
+    if (!mz.activeFrom) return mz.cycleAnchor ?? dates[0];
+    const rank = withAlta.indexOf(mz) % 2;
+    return rank === 0 ? firstAlta : addDaysIso(firstAlta, 5);
+  };
+  for (const mz of mozos) {
     for (const d of dates) {
-      const phase = (((diffDays(d, mz.cycleAnchor ?? dates[0]) % 10) + 10) % 10);
+      const phase = (((diffDays(d, anchorOf(mz)) % 10) + 10) % 10);
       set(mz.id, d, offCode(mz.id, d) ?? pinnedWork(mz.id, d) ?? (phase < 5 ? "MZ" : "D"));
     }
   }
@@ -261,6 +278,7 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
           .filter((r) => {
             const s = st[r.id];
             if (taken.has(r.id) || s.streak >= LEGAL_STREAK || offCode(r.id, d)) return false;
+            if (pinnedWork(r.id, d) && pinnedWork(r.id, d) !== slot) return false; // pinned to another slot
             if (s.last === "N" && slot !== "N") return false;
             return !(slot === "M" && s.last === "T");
           })

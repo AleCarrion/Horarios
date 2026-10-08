@@ -2,13 +2,14 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { isWeekend, monthDates, weekday } from "@/lib/domain/dates";
+import { isHoliday } from "@/lib/domain/holidays";
 import { allowedShifts } from "@/lib/domain/rules";
 import { SHIFTS, displayCode, type Schedule, type ShiftCode, type Staff } from "@/lib/domain/types";
 import type { Validation } from "@/lib/domain/validate";
 import { SHIFT_STYLE, WEEKDAYS } from "@/lib/ui";
 import { SECTIONS } from "@/lib/domain/team";
 import type { Role } from "@/lib/domain/types";
-import { CalendarIcon, CheckIcon, GripIcon } from "./icons";
+import { CalendarIcon, CheckIcon, GripIcon, LockIcon } from "./icons";
 
 const WEEKDAY_NAMES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 const ROLE_LABEL: Record<Staff["role"], string> = {
@@ -48,13 +49,16 @@ interface Props {
   onPlan?: (staffId: string, date: string, kind: "D" | "V", days: number) => void;
   /** Exchange shifts with another person on this day (optionally exchanging again on `returnDate`). */
   onSwap?: (a: string, b: string, date: string, returnDate?: string) => void;
+  /** Locked cells (staffId -> date -> true) and the action to lock/unlock a range of days. */
+  locked?: Record<string, Record<string, boolean>>;
+  onLock?: (staffId: string, dates: string[], on: boolean) => void;
   /** Cells a pending plan would change ("staffId|date"), outlined in the grid. */
   preview?: Set<string>;
   readOnly?: boolean;
   today?: string | null;
 }
 
-export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, onCalendar, onMove, onPlan, onSwap, preview, readOnly, today }: Props) {
+export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, onCalendar, onMove, onPlan, onSwap, locked, onLock, preview, readOnly, today }: Props) {
   const dates = monthDates(year, month);
   const [menu, setMenu] = useState<{ staff: Staff; date: string; x: number; y: number } | null>(null);
   const [days, setDays] = useState(1);
@@ -211,10 +215,13 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                     key={d}
                     scope="col"
                     data-colhead={d}
+                    title={isHoliday(d) ? "Festivo" : undefined}
                     className={`min-w-9 rounded-xl px-0.5 py-1.5 text-center font-semibold transition-colors ${
                       isToday
                         ? "bg-gradient-to-b from-brand to-brand-2 text-white shadow-md"
-                        : isWeekend(d)
+                        : isHoliday(d)
+                          ? "bg-[#ffff00] text-black"
+                          : isWeekend(d)
                           ? "bg-accent/15 text-accent"
                           : "bg-card-solid text-foreground"
                     }`}
@@ -306,13 +313,14 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                         data-col={d}
                         disabled={readOnly}
                         aria-haspopup="listbox"
-                        aria-label={cellLabel(s, d, code)}
+                        aria-label={`${cellLabel(s, d, code)}${locked?.[s.id]?.[d] ? ", bloqueada" : ""}`}
                         onClick={(e) => openMenu(e, s.id, d)}
                         className={`relative flex h-9 w-9 items-center justify-center rounded-lg text-[13px] font-bold tracking-tight shadow-[inset_0_-2px_0_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.35)] transition-[transform,box-shadow] duration-150 enabled:cursor-pointer enabled:hover:z-10 enabled:hover:-translate-y-0.5 enabled:hover:scale-110 enabled:hover:shadow-lg enabled:active:scale-95 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
                           code === "B" ? "bg-[repeating-linear-gradient(135deg,#0b0b0b_0_5px,#1f1f1f_5px_10px)]" : SHIFT_STYLE[code]
                         } ${bad.has(`${s.id}|${d}`) ? "anim-alert ring-2 ring-red-600" : ""} ${preview?.has(`${s.id}|${d}`) ? "ring-[3px] ring-accent ring-offset-1 ring-offset-card-solid" : ""}`}
                       >
                         {displayCode(code)}
+                        {locked?.[s.id]?.[d] && <LockIcon width={9} height={9} className="absolute right-0.5 top-0.5 opacity-70" />}
                       </button>
                     </td>
                   );
@@ -416,6 +424,22 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
               />
               días
             </label>
+            {onLock && (
+              <button
+                type="button"
+                onClick={() => {
+                  const start = dates.indexOf(menu.date);
+                  const on = !locked?.[menu.staff.id]?.[menu.date];
+                  onLock(menu.staff.id, dates.slice(start, start + days), on);
+                  closeMenu();
+                }}
+                className="mt-1 flex h-9 w-full items-center gap-2 rounded-xl px-2 text-left text-sm font-medium transition hover:bg-brand/10 focus-visible:bg-brand/15 focus-visible:outline-2 focus-visible:outline-brand"
+              >
+                <LockIcon width={15} height={15} className="text-muted" />
+                {locked?.[menu.staff.id]?.[menu.date] ? "Desbloquear casilla" : "Bloquear casilla"}
+                <span className="ml-auto text-[11px] font-normal text-muted">no se mueve sola</span>
+              </button>
+            )}
             {onSwap && (
               <div className="mt-2 space-y-1.5 border-t border-line px-2 pt-2 text-xs text-muted">
                 <label className="flex items-center gap-2">

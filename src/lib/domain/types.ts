@@ -53,6 +53,8 @@ export interface GeneratorConfig {
   maxSeniorMornings?: number;
   /** Max consecutive working days for receptionists. */
   maxStreak?: number;
+  /** Local holidays (YYYY-MM-DD) on top of the national ones; the director rests on all of them. */
+  extraHolidays?: string[];
   /** The previous month (or just its last days): streaks, rest runs and shift blocks carry over into this month. */
   history?: Schedule;
   /** Shift of each staff member on the day before day 1 (cross-month rules). Superseded by `history`. */

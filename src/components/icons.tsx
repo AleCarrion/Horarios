@@ -79,3 +79,6 @@ export const TrashIcon = (p: SVGProps<SVGSVGElement>) => (
 export const PlusIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}><path d="M12 5v14M5 12h14" /></svg>
 );
+export const LockIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base({ strokeWidth: 2.5, ...p })}><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+);

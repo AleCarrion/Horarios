@@ -5,7 +5,7 @@ import { generateSchedule } from "@/lib/domain/generator";
 import { applyEdits, applyRemote, createHistory, redo, undo, type Edit } from "@/lib/domain/history";
 import { DEFAULT_STAFF } from "@/lib/domain/roster";
 import { addStaff, changeRole, moveStaff, updateStaff } from "@/lib/domain/team";
-import { clearScheduleCache, nextStored, peekFor, prevMonth, readStored, scheduleForAsync, storageKey } from "@/lib/monthStore";
+import { clearScheduleCache, lockedCount, nextStored, peekFor, prevMonth, readLocks, readStored, scheduleForAsync, setLocked, storageKey, writeLocks, type Locks } from "@/lib/monthStore";
 import { readRoster, writeRoster } from "@/lib/staffStore";
 import { useRemoteStaff } from "@/lib/useRemoteStaff";
 import { diffSchedules } from "@/lib/sync";
@@ -21,7 +21,7 @@ import { useAuth } from "@/lib/useAuth";
 import { useRemoteSchedule } from "@/lib/useRemoteSchedule";
 import { AuthBar } from "./AuthBar";
 import { ExportMenu } from "./ExportMenu";
-import { ChevronLeft, ChevronRight, CheckIcon, LogoMark, RedoIcon, SparklesIcon, UndoIcon } from "./icons";
+import { ChevronLeft, ChevronRight, CheckIcon, LockIcon, LogoMark, RedoIcon, SparklesIcon, UndoIcon } from "./icons";
 import { TeamPanel } from "./TeamPanel";
 import { PlanDialog } from "./PlanDialog";
 import { ScheduleGrid } from "./ScheduleGrid";
@@ -66,6 +66,7 @@ export function ScheduleApp() {
 
   const [staff, setStaff] = useState<Staff[]>(DEFAULT_STAFF);
   const [today, setToday] = useState<string | null>(null);
+  const [locks, setLocks] = useState<Locks>({});
   const [plan, setPlan] = useState<{ plan: Plan; title: string; team?: Staff[] } | null>(null);
   useEffect(() => {
     // localStorage / the clock are only safe to read after mount
@@ -97,6 +98,7 @@ export function ScheduleApp() {
 
   useEffect(() => {
     dispatch({ type: "reset", schedule: load(ym.year, ym.month) });
+    setLocks(readLocks(ym.year, ym.month)); // eslint-disable-line react-hooks/set-state-in-effect
     let alive = true;
     const p = prevMonth(ym.year, ym.month);
     void (async () => {
@@ -161,6 +163,10 @@ export function ScheduleApp() {
         seed: Date.now() % 97,
         history,
         unavailable,
+        // manager-locked cells stay exactly as they are
+        pinned: Object.fromEntries(
+          list.map((p) => [p.id, Object.fromEntries(Object.keys(locks[p.id] ?? {}).filter((d) => locks[p.id][d] && h.present[p.id]?.[d]).map((d) => [d, h.present[p.id][d]]))]),
+        ),
         jcRestDays: night
           ? Object.entries(h.present[night.id] ?? {}).filter(([, c]) => c === "D").map(([d]) => d)
           : undefined,
@@ -189,7 +195,7 @@ export function ScheduleApp() {
   const proposeTeam = (next: Staff[], title: string) => {
     if (next === staff) return;
     const result = planRestructure(
-      { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month) },
+      { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: locks },
       next,
       monthStart,
     );
@@ -241,7 +247,7 @@ export function ScheduleApp() {
     const all = Object.keys(h.present[staffId] ?? {}).sort();
     const to = all[Math.min(all.indexOf(from) + days - 1, all.length - 1)] ?? from;
     const result = planDayOff(
-      { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month) },
+      { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: locks },
       staffId,
       from,
       kind,
@@ -256,7 +262,7 @@ export function ScheduleApp() {
   const requestSwap = (a: string, b: string, date: string, returnDate?: string) => {
     const pa = staff.find((x) => x.id === a);
     const pb = staff.find((x) => x.id === b);
-    const result = planShiftSwap({ year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month) }, a, b, date, returnDate);
+    const result = planShiftSwap({ year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: locks }, a, b, date, returnDate);
     setPlan({
       plan: result,
       title: `Cambio de turno · ${pa?.name} ↔ ${pb?.name} · ${Number(date.slice(8))}${returnDate ? ` y ${Number(returnDate.slice(8))}` : ""} ${MONTHS[ym.month - 1].toLowerCase()}`,
@@ -266,9 +272,32 @@ export function ScheduleApp() {
     if (!plan) return;
     if (plan.team) saveTeam(plan.team);
     dispatch({ type: "replace", schedule: plan.plan.schedule });
+    if (plan.plan.pins.length) {
+      // what was asked for (and approved) stays as decided
+      const next = setLocked(locks, plan.plan.pins, true);
+      setLocks(next);
+      writeLocks(ym.year, ym.month, next);
+    }
     setPlan(null);
   };
   const previewCells = useMemo(() => new Set(plan && !plan.team ? plan.plan.changes.map((c) => `${c.staffId}|${c.date}`) : []), [plan]);
+
+  const changeLocks = (staffId: string, dates: string[], on: boolean) => {
+    const next = setLocked(locks, dates.map((date) => ({ staffId, date })), on);
+    setLocks(next);
+    writeLocks(ym.year, ym.month, next);
+  };
+  /** A manual edit is a decision: lock it so later re-plans do not undo it. */
+  const editCells = (edits: { staffId: string; date: string; to: ShiftCode }[]) => {
+    dispatch({ type: "edit", edits });
+    const next = setLocked(locks, edits, true);
+    setLocks(next);
+    writeLocks(ym.year, ym.month, next);
+  };
+  const unlockAll = () => {
+    setLocks({});
+    writeLocks(ym.year, ym.month, {});
+  };
 
   const fileBase = `horario-${ym.year}-${String(ym.month).padStart(2, "0")}`;
   const exportCSV = () =>
@@ -352,6 +381,14 @@ export function ScheduleApp() {
           ))}
         </ul>
 
+        {lockedCount(locks) > 0 && (
+          <p className="glass anim-fade-up flex flex-wrap items-center gap-2 rounded-xl px-3 py-2 text-sm print:hidden">
+            <LockIcon width={14} height={14} className="text-muted" />
+            {lockedCount(locks)} casilla{lockedCount(locks) === 1 ? "" : "s"} bloqueada{lockedCount(locks) === 1 ? "" : "s"}: no se mueven al reajustar ni al generar.
+            <button onClick={unlockAll} className="font-semibold text-brand underline-offset-2 hover:underline">Quitar todos los bloqueos</button>
+          </p>
+        )}
+
         {remote.unpublished ? (
           <p className="glass rounded-2xl p-6 text-center font-medium">Este mes todavía no está publicado.</p>
         ) : (
@@ -364,7 +401,9 @@ export function ScheduleApp() {
             staff={visible}
             schedule={plan?.team ? h.present : shown}
             validation={validation}
-            onEdit={(edits) => dispatch({ type: "edit", edits })}
+            onEdit={editCells}
+            locked={locks}
+            onLock={readOnly ? undefined : changeLocks}
             onCalendar={exportICS}
             onMove={readOnly ? undefined : onMovePerson}
             onPlan={readOnly ? undefined : requestDays}

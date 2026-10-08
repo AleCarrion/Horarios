@@ -49,11 +49,19 @@ describe("alta/baja dates generate B automatically (September 2026)", () => {
     expect(validateSchedule(schedule, staff, 2026, 9).issues).toEqual([]);
   });
 
-  it("a mozo's days before alta do not count towards the 5-5 cycle gap checks", () => {
-    // exactly one mozo works every day once both have started, as before
+  it("mozos start their 5-5 cycle on their alta date: one works 7-11, the other 12-16, and so on", () => {
+    // exactly one mozo works every day once both have started
     for (const d of range(7, 30)) {
       const working = ["alberto-m", "arturo"].filter((id) => schedule[id][d] === "MZ").length;
       expect(working).toBe(1);
     }
+    for (const d of range(7, 11)) expect(schedule["alberto-m"][d]).toBe("MZ");
+    for (const d of range(12, 16)) expect(schedule.arturo[d]).toBe("MZ");
+    for (const d of range(17, 21)) expect(schedule["alberto-m"][d]).toBe("MZ");
+  });
+
+  it("without an alta date the fixed anchors keep working as before", () => {
+    const r = generateSchedule({ year: 2026, month: 10, staff: DEFAULT_STAFF });
+    for (const d of monthDates(2026, 10)) expect(["alberto-m", "arturo"].filter((id) => r.schedule[id][d] === "MZ")).toHaveLength(1);
   });
 });

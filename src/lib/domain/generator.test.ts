@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateSchedule } from "./generator";
+import { holidaysOf } from "./holidays";
 import { validateSchedule } from "./validate";
 import { DEFAULT_STAFF } from "./roster";
 import { diffDays, isWeekend, monthDates } from "./dates";
@@ -35,8 +36,9 @@ describe.each([10, 2, 12])("month %i", (month) => {
     }
   });
 
-  it("Marta: S Mon-Fri, never nights, off weekends", () => {
-    for (const d of dates) expect(at("marta", d)).toBe(isWeekend(d) ? "D" : "S");
+  it("Marta: S Mon-Fri, never nights, off weekends and holidays", () => {
+    const hol = holidaysOf(2026);
+    for (const d of dates) expect(at("marta", d)).toBe(isWeekend(d) || hol.has(d) ? "D" : "S");
   });
 
   it("only receptionists work nights besides JC", () => {

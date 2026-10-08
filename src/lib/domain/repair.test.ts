@@ -143,3 +143,25 @@ describe("restructuring the team", () => {
     expect(plan.changes.length).toBeLessThan(40);
   });
 });
+
+describe("approved requests stay approved", () => {
+  it("pins the requested cells, and a later request never undoes an earlier one", () => {
+    const [a, b] = receptionists.filter((r) => !isOff(base[r.id][d(14)]));
+    const first = planDayOff(ctx(), a.id, d(14));
+    expect(first.pins).toContainEqual({ staffId: a.id, date: d(14) });
+    const locked: Record<string, Record<string, boolean>> = {};
+    for (const p of first.pins) (locked[p.staffId] ??= {})[p.date] = true;
+    // a second person asks for the same day: the first one's day off must survive whatever it takes
+    const second = planDayOff(ctx({ schedule: first.schedule, locked }), b.id, d(14));
+    expect(second.schedule[a.id][d(14)]).toBe("D");
+    expect(second.schedule[b.id][d(14)]).toBe("D");
+  });
+
+  it("locked cells survive a restructure too", () => {
+    const who = receptionists.find((r) => !isOff(base[r.id][d(20)]))!;
+    const locked = { [who.id]: { [d(20)]: true } };
+    const temp: Staff = { id: "temp", name: "Refuerzo", role: "receptionist", activeFrom: d(15) };
+    const plan = planRestructure(ctx({ locked }), [...DEFAULT_STAFF, temp], d(15));
+    expect(plan.schedule[who.id][d(20)]).toBe(base[who.id][d(20)]);
+  });
+});

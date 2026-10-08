@@ -41,6 +41,8 @@ export interface Plan {
   issues: Issue[];
   warnings: Warning[];
   reason?: string;
+  /** Cells to lock once the plan is applied: what was asked for, so a later re-plan does not undo it. */
+  pins: { staffId: string; date: string }[];
   /** How far ahead of the earliest affected day the request was made (needs `today`). */
   notice?: { daysAhead: number; short: boolean };
 }
@@ -244,7 +246,7 @@ function trySwap(ctx: RepairContext, who: string, date: string, known: Set<strin
       if (newHard(ctx, next, known).length) continue;
       const dist = Math.abs(dates.indexOf(r) - dates.indexOf(date));
       if (!best || dist < best.dist)
-        best = { dist, plan: { level: "green", strategy: "swap", schedule: next, changes: diff(ctx, next), issues: [], warnings: [] } };
+        best = { dist, plan: { level: "green", strategy: "swap", schedule: next, changes: diff(ctx, next), issues: [], warnings: [], pins: [{ staffId: who, date }] } };
     }
   }
   return best?.plan ?? null;
@@ -261,7 +263,7 @@ export function planDayOff(ctx: RepairContext, staffId: string, from: string, ki
 function planDayOffInner(ctx: RepairContext, staffId: string, from: string, kind: "D" | "V", to: string): Plan {
   const person = ctx.staff.find((s) => s.id === staffId);
   const days = monthDates(ctx.year, ctx.month).filter((x) => x >= from && x <= to);
-  const none = (level: Level, reason?: string): Plan => ({ level, strategy: "none", schedule: ctx.schedule, changes: [], issues: [], warnings: [], reason });
+  const none = (level: Level, reason?: string): Plan => ({ level, strategy: "none", schedule: ctx.schedule, changes: [], issues: [], warnings: [], pins: [], reason });
   if (!person || !days.length) return none("red", "Persona o fechas no válidas");
 
   const first = firstEditable(ctx);
@@ -298,6 +300,7 @@ function planDayOffInner(ctx: RepairContext, staffId: string, from: string, kind
     changes: diff(ctx, lean),
     issues: cand.hard,
     warnings: cand.warnings,
+    pins: days.map((x) => ({ staffId, date: x })),
     reason: reasonFor(cand.hard),
   };
 }
@@ -319,6 +322,7 @@ export function planRestructure(ctx: RepairContext, newStaff: Staff[], from: str
     changes: diff({ ...ctx, staff: newStaff }, lean),
     issues: cand.hard,
     warnings: cand.warnings,
+    pins: [],
     reason: reasonFor(cand.hard),
   };
 }
@@ -338,7 +342,7 @@ function exchange(schedule: Schedule, a: string, b: string, date: string): Sched
  */
 export function planShiftSwap(ctx: RepairContext, a: string, b: string, date: string, returnDate?: string): Plan {
   const days = [date, ...(returnDate ? [returnDate] : [])];
-  const none = (reason: string): Plan => withNotice(ctx, { level: "red", strategy: "none", schedule: ctx.schedule, changes: [], issues: [], warnings: [], reason }, date);
+  const none = (reason: string): Plan => withNotice(ctx, { level: "red", strategy: "none", schedule: ctx.schedule, changes: [], issues: [], warnings: [], pins: [], reason }, date);
   const pa = ctx.staff.find((s) => s.id === a);
   const pb = ctx.staff.find((s) => s.id === b);
   if (!pa || !pb || a === b) return none("Elige a dos personas distintas.");
@@ -353,13 +357,13 @@ export function planShiftSwap(ctx: RepairContext, a: string, b: string, date: st
     if (ca !== cb && (!allowedShifts(pa).includes(cb) || !allowedShifts(pb).includes(ca)))
       return none(`${pa.name} y ${pb.name} no pueden intercambiar esos turnos: su puesto no lo permite.`);
   }
-  if (days.every((x) => ctx.schedule[a][x] === ctx.schedule[b][x])) return withNotice(ctx, { level: "green", strategy: "none", schedule: ctx.schedule, changes: [], issues: [], warnings: [] }, date);
+  if (days.every((x) => ctx.schedule[a][x] === ctx.schedule[b][x])) return withNotice(ctx, { level: "green", strategy: "none", schedule: ctx.schedule, changes: [], issues: [], warnings: [], pins: [] }, date);
 
   const known = baseIssueKeys(ctx);
   let direct = ctx.schedule;
   for (const day of days) direct = exchange(direct, a, b, day);
   if (newHard(ctx, direct, known).length === 0)
-    return withNotice(ctx, { level: "green", strategy: "swap", schedule: direct, changes: diff(ctx, direct), issues: [], warnings: [] }, date);
+    return withNotice(ctx, { level: "green", strategy: "swap", schedule: direct, changes: diff(ctx, direct), issues: [], warnings: [], pins: days.flatMap((x) => [{ staffId: a, date: x }, { staffId: b, date: x }]) }, date);
 
   // The plain exchange breaks a rule (e.g. a tarde followed by a mañana): re-plan around it with the exchange pinned.
   const fixed = new Set<string>();
@@ -389,6 +393,7 @@ export function planShiftSwap(ctx: RepairContext, a: string, b: string, date: st
       changes: diff(ctx, lean),
       issues: cand.hard,
       warnings: cand.warnings,
+      pins: days.flatMap((x) => [{ staffId: a, date: x }, { staffId: b, date: x }]),
       reason: reasonFor(cand.hard),
     },
     date,
