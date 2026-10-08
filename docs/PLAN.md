@@ -52,7 +52,7 @@ Leyenda: **S** = menos de medio día · **M** = 1–2 días · **L** = varios d�
 
 ## 2. Riesgos y fallos que he detectado en el estudio
 
-1. 🔴 **Lectura pública en la base de datos**: las políticas actuales permiten `select` a cualquiera con la clave *anon* (plantilla y cuadrante). La clave es pública en el navegador, así que hay que exigir sesión.
+1. 🟢 **Lectura abierta en la base de datos** (decisión de la propietaria: **la app no se cierra**). Cualquiera que conozca la dirección puede *ver* el cuadrante sin iniciar sesión; solo la jefa puede *modificar* (eso sí está protegido). Se mantiene así porque la dirección es privada y casi nadie entra. Si algún día cambia, es un ajuste de una línea en las políticas.
 2. 🔴 **Los datos viven solo en `localStorage`** cuando no hay Supabase: borrar datos del navegador = perder el cuadrante. No hay copia de seguridad ni importar/exportar todo.
 3. 🔴 **Sin control de versiones de mes**: no hay "mes publicado" frente a "borrador" persistido ni instantáneas; un error de edición no se puede recuperar tras cerrar.
 4. 🔴 **Primera sincronización sin estrategia de conflictos**: al conectar Supabase hay datos locales y remotos; falta decidir qué gana, avisar y fusionar.
@@ -70,7 +70,7 @@ Leyenda: **S** = menos de medio día · **M** = 1–2 días · **L** = varios d�
 
 ## 3. Plan por fases
 
-### Fase A — Antes de tocar Supabase (cerrar la app) · 🔴
+### Fase A — Antes de tocar Supabase (terminar de pulir la app, sin restringir el acceso) · 🔴
 | # | Tarea | Tamaño | Criterio de aceptación |
 |---|---|---|---|
 | A1 | Copia de seguridad: exportar/importar **todo** (equipo, meses, solicitudes, bloqueos) en un JSON versionado | M | Exportar → borrar datos → importar deja la app idéntica; test de ida y vuelta |
@@ -83,18 +83,18 @@ Leyenda: **S** = menos de medio día · **M** = 1–2 días · **L** = varios d�
 | A8 | Explicar los rojos: "qué desbloquear/relajar para que cuadre" | L | Para un plan rojo, sugiere 1–3 acciones que lo vuelven verde (verificadas con el motor) |
 | A9 | Páginas de error y 404, aviso de "nueva versión disponible" del PWA | S | Probado con fallo forzado y con versión nueva del service worker |
 | A10 | CI (GitHub Actions: typecheck, lint, test, build) + tests e2e de los flujos clave (Playwright en el repo) | M | Cada push ejecuta todo; e2e: generar mes, editar celda, pedir libre, arreglar avisos, móvil |
-| A11 | Cabeceras de seguridad (CSP, HSTS, etc.) | S | Sin errores en consola; calificación A en un escáner de cabeceras |
+| A11 | Cabeceras de seguridad básicas (HSTS, X-Frame-Options…); la CSP es opcional | S | Sin errores en consola |
 
 ### Fase B — Supabase y base de datos (siguiente paso que ya has pedido) · 🔴
 | # | Tarea | Tamaño |
 |---|---|---|
 | B1 | Crear el proyecto real, ejecutar migraciones 0001–0004 + seed, variables en `.env.local` y Vercel, URL de redirección, fila en `editors` | S |
-| B2 | **Endurecer RLS**: nada de lectura anónima; roles `editor` (jefa), `viewer` (dirección), `worker` (futuro); pruebas de políticas (pgTAP o scripts) | M |
+| B2 | Mantener la **lectura abierta** (sin login para ver); comprobar con pruebas que **escribir** solo puede la jefa (`editor`); dejar preparados los roles `viewer` y `worker` para más adelante | S |
 | B3 | **Migración local → remoto**: primera conexión con diálogo "tienes datos en este dispositivo: subir / descartar / fusionar" | M |
 | B4 | Conflictos entre dispositivos: última escritura por celda ya existe; añadir aviso cuando alguien edita a la vez y versión por mes | M |
 | B5 | Tabla de **meses** (`schedule_months`: estado borrador/publicado, quién y cuándo publicó, parámetros del generador) y **reglas** (`rules`) | M |
 | B6 | Copias automáticas (backups diarios de Supabase / exportación programada) y entorno de **staging** distinto de producción | S |
-| B7 | Autenticación: caducidad de sesión, límite de intentos del enlace mágico, (opcional) 2FA para la jefa | S |
+| B7 | Autenticación solo de la jefa: sesión que no caduque en su móvil, límite de intentos del enlace mágico (2FA opcional) | S |
 | B8 | Pruebas contra un Supabase real (no solo mocks): suite de integración con una base de pruebas | M |
 
 ### Fase C — Trabajadores y avisos (lo dejaste "para el final") · 🟡
@@ -127,11 +127,13 @@ Leyenda: **S** = menos de medio día · **M** = 1–2 días · **L** = varios d�
 
 ## 4. Orden recomendado
 
-1. **A1, A2, A9, A10, A11** (red de seguridad: copia, estado del mes, errores, CI, cabeceras).
+1. **A1, A2, A9, A10, A11** (red de seguridad: copia, estado del mes, errores, CI, cabeceras; ninguna cierra el acceso).
 2. **A3, A4, A5, A7** (lo que más usará la jefa a diario).
 3. **A6, A8** (reglas editables y explicación de los rojos; es lo más grande, pero lo que más confianza da).
-4. **Fase B entera** (Supabase real, RLS endurecido, migración local→remoto, staging y backups).
+4. **Fase B entera** (Supabase real, solo la jefa edita, migración local→remoto, staging y backups).
 5. **Fase C** (trabajadores y avisos) y después **Fase D**.
+
+Principio acordado: **la app permanece abierta** (sin pantalla de acceso para ver); solo la edición va con la sesión de la jefa.
 
 Decisiones que necesito de ti antes de empezar la Fase B: ciudad/comunidad para los festivos locales, si la dirección debe tener
 acceso propio, cuántos días de vacaciones anuales y jornada contratada tiene cada persona (para saldos y horas), y qué plazo de
