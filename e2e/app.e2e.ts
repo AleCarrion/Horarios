@@ -110,6 +110,19 @@ test("reglas: los cambios se guardan, se recuerdan y se pueden restablecer", asy
   await expect(page.getByText("Todavía no hay ninguno.")).toBeVisible();
 });
 
+test("un mes publicado no se edita por accidente hasta reabrirlo", async ({ page, viewport }) => {
+  test.skip((viewport?.width ?? 1280) < 640, "la cuadrícula completa es de escritorio");
+  await open(page);
+  const day = await lateDay(page);
+  const cell = page.locator(`[data-row][data-col="${day}"]`).nth(3);
+  await page.getByRole("button", { name: "Publicar mes" }).click();
+  await expect(page.getByText("Publicado", { exact: true })).toBeVisible();
+  await expect(cell).toBeDisabled();
+  await page.getByRole("button", { name: "Reabrir para editar" }).click();
+  await cell.click();
+  await expect(page.getByRole("listbox")).toBeVisible();
+});
+
 test("la página de equipo lista la plantilla", async ({ page }) => {
   await page.goto("/equipo");
   await expect(page.getByRole("heading", { name: "Equipo" })).toBeVisible();

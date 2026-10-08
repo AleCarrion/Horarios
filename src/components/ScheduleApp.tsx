@@ -38,6 +38,8 @@ import { PlanDialog } from "./PlanDialog";
 import { MonthSummary } from "./MonthSummary";
 import { DEFAULT_RULES, localHolidaysOf, type Rules } from "@/lib/domain/ruleset";
 import { readRules } from "@/lib/rulesStore";
+import { isMonthClosed, monthLabel, type MonthState } from "@/lib/domain/monthStatus";
+import { readMonthState, writeMonthState } from "@/lib/monthStatusStore";
 import { ScheduleGrid } from "./ScheduleGrid";
 import { StatCards } from "./StatCards";
 
@@ -115,7 +117,19 @@ export function ScheduleApp() {
     onLoaded: (s) => dispatch({ type: "reset", schedule: s ?? load(ym.year, ym.month) }),
     onRemoteCell: (r) => dispatch({ type: "remote", staffId: r.staff_id, date: r.day, code: r.shift_code }),
   });
-  const readOnly = remoteConfigured && !remote.canEdit;
+  const remoteReadOnly = remoteConfigured && !remote.canEdit;
+  // a published month, or one that is over, is not edited by accident: reopen it first
+  const [monthState, setMonthState] = useState<MonthState | null>(null);
+  useEffect(() => {
+    setMonthState(readMonthState(ym.year, ym.month)); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [ym]);
+  const label = monthLabel(monthState, ym.year, ym.month, today);
+  const closed = isMonthClosed(monthState, ym.year, ym.month, today);
+  const readOnly = remoteReadOnly || closed;
+  const setState = (s: MonthState | null) => {
+    setMonthState(s);
+    writeMonthState(ym.year, ym.month, s);
+  };
 
   const weeks = useMemo(() => weeksOf(monthDates(ym.year, ym.month)), [ym]);
   useEffect(() => {
@@ -387,7 +401,7 @@ export function ScheduleApp() {
     { label: "Exportar PDF / imprimir", hint: "Una página A4 apaisada con todo el mes", icon: <PrinterIcon />, onClick: printMonth },
     { label: "Exportar CSV (Excel)", icon: <TableIcon />, onClick: exportCSV },
     { label: "Guardar copia de seguridad", hint: "Descarga todo: equipo, meses, solicitudes y bloqueos", icon: <DownloadIcon />, onClick: saveBackup },
-    ...(readOnly ? [] : [{ label: "Restaurar copia de seguridad", icon: <DownloadIcon />, onClick: () => restoreInput.current?.click() }]),
+    ...(remoteReadOnly ? [] : [{ label: "Restaurar copia de seguridad", icon: <DownloadIcon />, onClick: () => restoreInput.current?.click() }]),
     ...(remote.draft ? [{ label: "Publicar mes", icon: <DownloadIcon />, onClick: () => void remote.publish() }] : []),
     { label: "Generar automático", hint: "Rehace el calendario del mes", icon: <SparklesIcon />, onClick: () => setConfirmRegenerate(true), disabled: readOnly, tone: "accent" as const },
   ];
@@ -463,7 +477,7 @@ export function ScheduleApp() {
                 </span>
               )}
             </button>
-            <ExportMenu onPdf={printMonth} onCsv={exportCSV} onBackup={saveBackup} onRestore={readOnly ? undefined : () => restoreInput.current?.click()} />
+            <ExportMenu onPdf={printMonth} onCsv={exportCSV} onBackup={saveBackup} onRestore={remoteReadOnly ? undefined : () => restoreInput.current?.click()} />
             {remote.draft && (
               <button
                 className="rounded-xl border border-brand/40 bg-brand/10 px-3.5 py-2 text-sm font-semibold text-brand transition hover:-translate-y-0.5 hover:bg-brand/20"
@@ -502,6 +516,25 @@ export function ScheduleApp() {
             </li>
           ))}
         </ul>
+
+        {!remoteConfigured && (
+          <p className={`glass anim-fade-up flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-3 py-2 text-sm print:hidden ${closed ? "border-amber-400/60" : ""}`}>
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${closed ? "bg-amber-400/30 text-amber-900 dark:text-amber-200" : "bg-brand/10 text-brand"}`}>
+              {{ draft: "Borrador", published: "Publicado", past: "Mes cerrado", reopened: "Reabierto" }[label]}
+            </span>
+            <span className="min-w-0 flex-1 text-muted">
+              {label === "published" && "Este mes está dado por bueno: no se edita ni se rehace por accidente."}
+              {label === "past" && "Este mes ya ha pasado: está protegido para que no se cambie sin querer."}
+              {label === "reopened" && "Abierto para corregir algo. Vuelve a publicarlo cuando termines."}
+              {label === "draft" && "Todavía lo estás preparando. Publícalo cuando esté listo."}
+            </span>
+            {closed ? (
+              <button onClick={() => setState({ state: "reopened", at: new Date().toISOString() })} className="font-semibold text-brand underline-offset-2 hover:underline">Reabrir para editar</button>
+            ) : (
+              <button onClick={() => setState({ state: "published", at: new Date().toISOString() })} className="font-semibold text-brand underline-offset-2 hover:underline">Publicar mes</button>
+            )}
+          </p>
+        )}
 
         {lockedCount(locks) > 0 && (
           <p className="glass anim-fade-up flex flex-wrap items-center gap-2 rounded-xl px-3 py-2 text-sm print:hidden">
