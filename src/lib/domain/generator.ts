@@ -4,6 +4,10 @@ import type { GeneratorConfig, GeneratorResult, Schedule, ShiftCode, Staff, Warn
 const MONDAY_ANCHOR = "2026-01-05";
 /** Extra "workload days" a covering senior counts as having, so receptionists are preferred but seniors still share M/T. */
 const SENIOR_PENALTY = 45;
+/** Receptionists rotate in blocks of the same shift (BLOCK_MIN..BLOCK_MAX days) with at least MIN_REST days off between blocks. */
+const BLOCK_MIN = 3;
+const BLOCK_MAX = 5;
+const MIN_REST = 2;
 
 /** Spread `count` rest days in blocks of two, evenly through the month. */
 export function autoJcRestDays(dates: string[], count: number): string[] {
@@ -62,13 +66,24 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
   const st = Object.fromEntries(
     recs.map((r) => [
       r.id,
-      { last: (config.prevDay?.[r.id] ?? "D") as ShiftCode, streak: 0, worked: 0, M: 0, T: 0, N: 0 },
+      {
+        last: (config.prevDay?.[r.id] ?? "D") as ShiftCode,
+        streak: 0,
+        worked: 0,
+        M: 0,
+        T: 0,
+        N: 0,
+        blockLen: config.prevDay?.[r.id] && config.prevDay[r.id] !== "D" ? 1 : 0,
+        restRun: MIN_REST,
+        target: BLOCK_MIN,
+      },
     ]),
   );
   const seniorCovers: Record<string, number> = Object.fromEntries(seniors.map((s) => [s.id, 0]));
   const seniorLast: Record<string, ShiftCode> = Object.fromEntries(
     seniors.map((s) => [s.id, (config.prevDay?.[s.id] ?? "D") as ShiftCode]),
   );
+  const seniorBlock: Record<string, number> = Object.fromEntries(seniors.map((s) => [s.id, 0]));
   const coverCap = (s: Staff) => s.maxCovers ?? maxSeniorMornings;
   const seniorsFor = (slot: "M" | "T", d: string, ignoreCap = false) =>
     seniors.filter(
@@ -85,7 +100,8 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
     for (const slot of slots) {
       const eligible = recs.filter((r) => {
         const s = st[r.id];
-        if (taken.has(r.id) || s.last === "N" || s.streak >= maxStreak) return false;
+        if (taken.has(r.id) || s.streak >= maxStreak) return false;
+        if (s.last === "N" && slot !== "N") return false;
         if (slot === "M" && s.last === "T") return false;
         return true;
       });
@@ -99,7 +115,11 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
         slot === "M" && !tBackup ? eligible.filter((r) => recs.some((o) => o !== r && canDoT(o))) : eligible;
       const score = (r: Staff, i: number) => {
         const s = st[r.id];
-        return s.worked * 10 + s.streak * 2 + s[slot] * 8 + ((i + seed + di) % recs.length) * 0.1;
+        let v = s.worked * 10 + s.streak + s[slot] * 4 + ((i + seed + di) % recs.length) * 0.1;
+        if (s.last === slot) v += s.blockLen < BLOCK_MIN ? -70 : s.blockLen < s.target ? -35 : 30; // finish a started block, then end it at its target
+        else if (s.last !== "D") v += 25; // avoid switching shift without a rest day
+        else if (s.restRun < MIN_REST) v += 30; // rest at least MIN_REST days between blocks
+        return v;
       };
       const candidates: { id: string; score: number; senior: boolean }[] = pool.map((r) => ({
         id: r.id,
@@ -108,7 +128,14 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
       }));
       if (slot !== "N")
         for (const s of seniorsFor(slot, d).filter((x) => !taken.has(x.id)))
-          candidates.push({ id: s.id, score: seniorCovers[s.id] * 10 + SENIOR_PENALTY, senior: true });
+          candidates.push({
+            id: s.id,
+            score:
+              seniorCovers[s.id] * 10 +
+              SENIOR_PENALTY +
+              (seniorLast[s.id] === slot ? (seniorBlock[s.id] < BLOCK_MAX - 1 ? -30 : 30) : 0),
+            senior: true,
+          });
       candidates.sort((a, b) => a.score - b.score);
       let pick = candidates[0];
       if (!pick && slot !== "N") {
@@ -131,15 +158,28 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
       const s = st[r.id];
       const code = taken.has(r.id) ? (schedule[r.id][d] as ShiftCode) : "D";
       set(r.id, d, code);
-      if (code === "D") s.streak = 0;
-      else {
+      if (code === "D") {
+        s.streak = 0;
+        s.blockLen = 0;
+        s.restRun++;
+      } else {
         s.streak++;
         s.worked++;
         s[code as "M" | "T" | "N"]++;
+        s.restRun = 0;
+        if (code === s.last) s.blockLen++;
+        else {
+          s.blockLen = 1;
+          s.target = BLOCK_MIN + ((seed + di + recs.indexOf(r)) % (BLOCK_MAX - BLOCK_MIN + 1));
+        }
       }
       s.last = code;
     }
-    for (const s of seniors) seniorLast[s.id] = schedule[s.id][d];
+    for (const s of seniors) {
+      const code = schedule[s.id][d];
+      seniorBlock[s.id] = code === seniorLast[s.id] && (code === "M" || code === "T") ? seniorBlock[s.id] + 1 : 1;
+      seniorLast[s.id] = code;
+    }
   });
 
   const stats: GeneratorResult["stats"] = {};
