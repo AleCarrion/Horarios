@@ -4,9 +4,11 @@ import { useEffect, useMemo, useReducer, useState } from "react";
 import { generateSchedule } from "@/lib/domain/generator";
 import { applyEdits, applyRemote, createHistory, redo, undo, type Edit } from "@/lib/domain/history";
 import { DEFAULT_STAFF } from "@/lib/domain/roster";
-import { buildStaff, readOverrides, writeOverrides, type RosterOverrides } from "@/lib/rosterConfig";
+import { addStaff, changeRole, moveStaff, removeStaff, updateStaff } from "@/lib/domain/team";
+import { readRoster, writeRoster } from "@/lib/staffStore";
+import { useRemoteStaff } from "@/lib/useRemoteStaff";
 import { diffSchedules } from "@/lib/sync";
-import { isActive, type Schedule, type ShiftCode, type Staff } from "@/lib/domain/types";
+import { isActive, type Role, type Schedule, type ShiftCode, type Staff } from "@/lib/domain/types";
 import { validateSchedule } from "@/lib/domain/validate";
 import { MONTHS, SHIFT_STYLE } from "@/lib/ui";
 import { SHIFTS, displayCode } from "@/lib/domain/types";
@@ -18,7 +20,7 @@ import { useRemoteSchedule } from "@/lib/useRemoteSchedule";
 import { AuthBar } from "./AuthBar";
 import { ExportMenu } from "./ExportMenu";
 import { ChevronLeft, ChevronRight, CheckIcon, LogoMark, RedoIcon, SparklesIcon, UndoIcon } from "./icons";
-import { RosterPanel } from "./RosterPanel";
+import { TeamPanel } from "./TeamPanel";
 import { ScheduleGrid } from "./ScheduleGrid";
 import { StatCards } from "./StatCards";
 
@@ -53,7 +55,7 @@ function load(y: number, m: number): Schedule {
     const raw = localStorage.getItem(storageKey(y, m));
     if (raw) return JSON.parse(raw) as Schedule;
   } catch {}
-  return generateSchedule({ year: y, month: m, staff: buildStaff(readOverrides()) }).schedule;
+  return generateSchedule({ year: y, month: m, staff: readRoster() }).schedule;
 }
 
 export function ScheduleApp() {
@@ -63,15 +65,14 @@ export function ScheduleApp() {
     createHistory(generateSchedule({ year: ym.year, month: ym.month, staff: DEFAULT_STAFF }).schedule),
   );
 
-  const [overrides, setOverrides] = useState<RosterOverrides>({});
+  const [staff, setStaff] = useState<Staff[]>(DEFAULT_STAFF);
   const [today, setToday] = useState<string | null>(null);
   useEffect(() => {
     // localStorage / the clock are only safe to read after mount
-    setOverrides(readOverrides()); // eslint-disable-line react-hooks/set-state-in-effect
+    setStaff(readRoster()); // eslint-disable-line react-hooks/set-state-in-effect
     const t = new Date();
     setToday(`${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`);
   }, []);
-  const staff = useMemo<Staff[]>(() => buildStaff(overrides), [overrides]);
 
   const auth = useAuth();
   const remote = useRemoteSchedule({
@@ -114,9 +115,8 @@ export function ScheduleApp() {
       return { year: d.getFullYear(), month: d.getMonth() + 1 };
     });
 
-  const regenerate = (ov: RosterOverrides = overrides) => {
+  const regenerate = (list: Staff[] = staff) => {
     try { localStorage.removeItem(storageKey(ym.year, ym.month)); } catch {}
-    const list = buildStaff(ov);
     // Holidays (V), days out of the roster (B) and JC's rest days are inputs: edit them in the grid, then regenerate around them.
     const unavailable: Record<string, Record<string, "V" | "B">> = {};
     for (const p of list) {
@@ -126,6 +126,7 @@ export function ScheduleApp() {
         if (c === "V" || c === "B") (unavailable[p.id] ??= {})[d] = c;
       }
     }
+    const night = list.find((p) => p.role === "night_auditor");
     dispatch({
       type: "replace",
       schedule: generateSchedule({
@@ -134,17 +135,46 @@ export function ScheduleApp() {
         staff: list,
         seed: Date.now() % 97,
         unavailable,
-        jcRestDays: Object.entries(h.present.jc ?? {}).filter(([, c]) => c === "D").map(([d]) => d),
+        jcRestDays: night
+          ? Object.entries(h.present[night.id] ?? {}).filter(([, c]) => c === "D").map(([d]) => d)
+          : undefined,
       }).schedule,
     });
   };
 
-  const changeDates = (id: string, field: "activeFrom" | "activeTo", value: string) => {
-    const next = { ...overrides, [id]: { ...overrides[id], [field]: value || undefined } };
-    setOverrides(next);
-    writeOverrides(next);
-    regenerate(next);
+  // --- team: reorder / change puesto / rename / add / remove. Order-only changes keep the month untouched.
+  const saveTeam = (next: Staff[], recalc: boolean) => {
+    setStaff(next);
+    writeRoster(next);
+    if (recalc) regenerate(next);
   };
+  const onMovePerson = (id: string, role: Role, beforeId: string | null) => {
+    const next = moveStaff(staff, id, role, beforeId);
+    if (next === staff) return;
+    saveTeam(next, staff.find((x) => x.id === id)?.role !== role);
+  };
+  const nudge = (id: string, dir: -1 | 1) => {
+    const me = staff.find((x) => x.id === id);
+    if (!me) return;
+    const peers = staff.filter((x) => x.role === me.role);
+    const i = peers.findIndex((x) => x.id === id);
+    const j = i + dir;
+    if (j < 0 || j >= peers.length) return;
+    // moving down = before the person two places ahead; moving up = before the previous one
+    const before = dir === -1 ? peers[j].id : (peers[j + 1]?.id ?? null);
+    saveTeam(moveStaff(staff, id, me.role, before), false);
+  };
+  const changeDates = (id: string, field: "activeFrom" | "activeTo", value: string) =>
+    saveTeam(updateStaff(staff, id, { [field]: value || undefined }), true);
+
+  const staffRemote = useRemoteStaff({
+    auth,
+    staff,
+    onLoaded: (team) => {
+      setStaff(team);
+      writeRoster(team);
+    },
+  });
 
   const fileBase = `horario-${ym.year}-${String(ym.month).padStart(2, "0")}`;
   const exportCSV = () =>
@@ -210,7 +240,7 @@ export function ScheduleApp() {
       </header>
 
       <main className="mx-auto w-full min-w-0 max-w-[1500px] space-y-4 p-4">
-        {remoteConfigured && <AuthBar auth={auth} status={remote.status} />}
+        {remoteConfigured && <AuthBar auth={auth} status={staffRemote.pending && remote.status === "synced" ? "pending" : remote.status} />}
 
         <StatCards coveragePct={stats.pct} covered={stats.covered} total={stats.total} issues={validation.issues.length} people={stats.people} />
 
@@ -242,6 +272,7 @@ export function ScheduleApp() {
             validation={validation}
             onEdit={(edits) => dispatch({ type: "edit", edits })}
             onCalendar={exportICS}
+            onMove={readOnly ? undefined : onMovePerson}
           />
         )}
 
@@ -265,7 +296,16 @@ export function ScheduleApp() {
           )}
         </section>
 
-        <RosterPanel staff={staff} overrides={overrides} disabled={readOnly} onChange={changeDates} />
+        <TeamPanel
+          staff={staff}
+          disabled={readOnly}
+          onRename={(id, name) => saveTeam(updateStaff(staff, id, { name }), false)}
+          onRole={(id, role) => saveTeam(changeRole(staff, id, role), true)}
+          onDates={changeDates}
+          onNudge={nudge}
+          onRemove={(id) => saveTeam(removeStaff(staff, id), true)}
+          onAdd={(name, role) => saveTeam(addStaff(staff, { name, role }), true)}
+        />
       </main>
     </>
   );

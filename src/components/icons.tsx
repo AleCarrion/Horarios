@@ -64,3 +64,18 @@ export const LogoMark = (p: SVGProps<SVGSVGElement>) => (
     <rect x="14" y="22" width="4" height="3.5" rx="1" fill="#fb923c" />
   </svg>
 );
+export const GripIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base({ strokeWidth: 2.5, ...p })}><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" /></svg>
+);
+export const ArrowUp = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+);
+export const ArrowDown = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M12 5v14M5 12l7 7 7-7" /></svg>
+);
+export const TrashIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13M9 7V4h6v3" /></svg>
+);
+export const PlusIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M12 5v14M5 12h14" /></svg>
+);

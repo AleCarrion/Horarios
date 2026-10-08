@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { isWeekend, monthDates, weekday } from "@/lib/domain/dates";
 import { allowedShifts } from "@/lib/domain/rules";
 import { SHIFTS, displayCode, type Schedule, type ShiftCode, type Staff } from "@/lib/domain/types";
 import type { Validation } from "@/lib/domain/validate";
 import { SHIFT_STYLE, WEEKDAYS } from "@/lib/ui";
-import { CalendarIcon, CheckIcon } from "./icons";
+import { SECTIONS } from "@/lib/domain/team";
+import type { Role } from "@/lib/domain/types";
+import { CalendarIcon, CheckIcon, GripIcon } from "./icons";
 
 const WEEKDAY_NAMES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 const ROLE_LABEL: Record<Staff["role"], string> = {
@@ -40,11 +42,13 @@ interface Props {
   validation: Validation;
   onEdit: (edits: { staffId: string; date: string; to: ShiftCode }[]) => void;
   onCalendar?: (staff: Staff) => void;
+  /** Drag a person to reorder them or drop them in another section (changes their puesto). */
+  onMove?: (id: string, role: Role, beforeId: string | null) => void;
   readOnly?: boolean;
   today?: string | null;
 }
 
-export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, onCalendar, readOnly, today }: Props) {
+export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, onCalendar, onMove, readOnly, today }: Props) {
   const dates = monthDates(year, month);
   const [menu, setMenu] = useState<{ staff: Staff; date: string; x: number; y: number } | null>(null);
   const [days, setDays] = useState(1);
@@ -136,6 +140,41 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
     setMenu({ staff: person, date, x: Math.min(r.left, window.innerWidth - 232), y });
   };
 
+  // --- drag & drop of people (rows) between and inside sections
+  const dragId = useRef<string | null>(null);
+  const clearDrop = () =>
+    tableRef.current?.querySelectorAll(".drop-before,.drop-after,.drop-into").forEach((el) => el.classList.remove("drop-before", "drop-after", "drop-into"));
+  const membersOf = (role: Role) => staff.filter((x) => x.role === role && x.id !== dragId.current);
+  const dropOnRow = (e: React.DragEvent, target: Staff, commit: boolean) => {
+    if (!dragId.current || !onMove) return;
+    e.preventDefault();
+    const r = e.currentTarget.getBoundingClientRect();
+    const after = e.clientY > r.top + r.height / 2;
+    if (!commit) {
+      clearDrop();
+      e.currentTarget.classList.add(after ? "drop-after" : "drop-before");
+      return;
+    }
+    const peers = membersOf(target.role);
+    const i = peers.findIndex((x) => x.id === target.id);
+    const before = target.id === dragId.current ? null : (peers[after ? i + 1 : i]?.id ?? null);
+    onMove(dragId.current, target.role, before);
+    clearDrop();
+    dragId.current = null;
+  };
+  const dropOnSection = (e: React.DragEvent, role: Role, commit: boolean) => {
+    if (!dragId.current || !onMove) return;
+    e.preventDefault();
+    if (!commit) {
+      clearDrop();
+      e.currentTarget.classList.add("drop-into");
+      return;
+    }
+    onMove(dragId.current, role, membersOf(role)[0]?.id ?? null);
+    clearDrop();
+    dragId.current = null;
+  };
+
   const bad = new Set(validation.issues.filter((i) => i.staffId).map((i) => `${i.staffId}|${i.date}`));
   const cellLabel = (s: Staff, d: string, code: ShiftCode) => `${s.name}, ${d}, ${SHIFTS[code].label} ${displayCode(code)}`;
 
@@ -177,14 +216,51 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
             </tr>
           </thead>
           <tbody>
-            {staff.map((s) => (
+            {SECTIONS.map(({ role, label }) => (
+              <Fragment key={role}>
+                <tr>
+                  <th
+                    colSpan={dates.length + 1}
+                    scope="colgroup"
+                    onDragOver={(e) => dropOnSection(e, role, false)}
+                    onDragLeave={clearDrop}
+                    onDrop={(e) => dropOnSection(e, role, true)}
+                    className="sticky left-0 rounded-lg px-2 pb-0.5 pt-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-muted transition-colors [&.drop-into]:bg-accent/20"
+                  >
+                    {label}
+                    <span className="ml-2 font-medium normal-case tracking-normal opacity-70">{staff.filter((x) => x.role === role).length}</span>
+                  </th>
+                </tr>
+                {staff.filter((x) => x.role === role).map((s) => (
               <tr key={s.id} className="group">
                 <th
                   scope="row"
                   data-rowhead={s.id}
+                  draggable={Boolean(onMove)}
+                  onDragStart={(e) => {
+                    dragId.current = s.id;
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", s.id);
+                    e.currentTarget.classList.add("opacity-50");
+                  }}
+                  onDragEnd={(e) => {
+                    dragId.current = null;
+                    e.currentTarget.classList.remove("opacity-50");
+                    clearDrop();
+                  }}
+                  onDragOver={(e) => dropOnRow(e, s, false)}
+                  onDragLeave={clearDrop}
+                  onDrop={(e) => dropOnRow(e, s, true)}
                   className="sticky left-0 z-10 rounded-xl bg-card-solid p-1.5 pr-2 text-left font-medium transition-colors"
                 >
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2">
+                    {onMove && (
+                      <GripIcon
+                        width={14}
+                        height={14}
+                        className="print-hide -mr-1 shrink-0 cursor-grab text-muted opacity-40 transition group-hover:opacity-100 active:cursor-grabbing"
+                      />
+                    )}
                     <span
                       aria-hidden="true"
                       className={`grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br text-[11px] font-bold text-white shadow ${ROLE_COLOR[s.role]}`}
@@ -231,6 +307,8 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                   );
                 })}
               </tr>
+                ))}
+              </Fragment>
             ))}
           </tbody>
           <tfoot>

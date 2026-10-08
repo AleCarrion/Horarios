@@ -96,6 +96,10 @@ body {
   color: var(--foreground);
 }
 
+/* Drag & drop of people in the schedule */
+.schedule-table .drop-before { box-shadow: 0 -3px 0 0 var(--accent); }
+.schedule-table .drop-after { box-shadow: 0 3px 0 0 var(--accent); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;

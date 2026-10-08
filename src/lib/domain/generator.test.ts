@@ -222,3 +222,12 @@ describe("robustness across months and seeds", () => {
       }
   });
 });
+
+describe("team without a night auditor", () => {
+  it("plans every night with receptionists (and reports the gaps it cannot close)", () => {
+    const staff = DEFAULT_STAFF.filter((x) => x.role !== "night_auditor");
+    const r = generateSchedule({ year: 2026, month: 10, staff });
+    const nights = monthDates(2026, 10).filter((d) => Object.values(r.schedule).some((row) => row[d] === "N"));
+    expect(nights.length).toBeGreaterThan(20);
+  });
+});

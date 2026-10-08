@@ -75,8 +75,11 @@ function generateOnce(config: GeneratorConfig): GeneratorResult {
     return config.unavailable?.[id]?.[d];
   };
 
+  // Without a night auditor on the team every night has to be covered by receptionists.
   const jcRest = new Set(
-    config.jcRestDays ?? autoJcRestDays(dates, config.jcRestCount ?? 10),
+    byRole("night_auditor").length === 0
+      ? dates
+      : (config.jcRestDays ?? autoJcRestDays(dates, config.jcRestCount ?? 10)),
   );
   // JC's holidays leave their nights uncovered just like rest days do.
   for (const jc of byRole("night_auditor")) for (const d of dates) if (offCode(jc.id, d)) jcRest.add(d);
