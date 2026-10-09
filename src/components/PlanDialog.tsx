@@ -22,9 +22,11 @@ interface Props {
   staff: Staff[];
   onApply: () => void;
   onCancel: () => void;
+  /** The manager accepts "release these locked cells": the caller releases them and plans again. */
+  onUnlock?: (cells: { staffId: string; date: string }[]) => void;
 }
 
-export function PlanDialog({ plan, label, others = [], title, staff, onApply, onCancel }: Props) {
+export function PlanDialog({ plan, label, others = [], title, staff, onApply, onCancel, onUnlock }: Props) {
   const apply = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     apply.current?.focus();
@@ -47,6 +49,7 @@ export function PlanDialog({ plan, label, others = [], title, staff, onApply, on
         .map(name),
     ),
   ];
+  const tips = sections.flatMap((x) => x.plan.suggestions ?? []);
   const total = sections.reduce((n, x) => n + x.plan.changes.length, 0);
 
   return (
@@ -74,6 +77,28 @@ export function PlanDialog({ plan, label, others = [], title, staff, onApply, on
             ))}
           </span>
         </p>
+        {tips.length > 0 && (
+          <div className="mt-3 rounded-xl border border-line bg-card-solid/60 p-3 text-sm">
+            <p className="font-semibold">Cómo conseguir que cuadre</p>
+            <ul className="mt-1.5 space-y-2">
+              {tips.map((t) => (
+                <li key={t.text} className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="min-w-0 flex-1 basis-48">{t.text}</span>
+                  {t.kind === "unlock" && onUnlock && (
+                    <button type="button" onClick={() => onUnlock(t.cells ?? [])} className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white shadow transition hover:brightness-110 active:scale-95">
+                      Desbloquear y recalcular
+                    </button>
+                  )}
+                  {t.kind === "rule" && (
+                    <a href="/reglas" className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-brand transition hover:bg-brand/10">
+                      Ver reglas
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {plan.notice && (
           <p className={`mt-2 rounded-lg px-3 py-1.5 text-xs ${plan.notice.short ? "bg-amber-400/20 text-amber-800 dark:text-amber-200" : "bg-brand/5 text-muted"}`}>

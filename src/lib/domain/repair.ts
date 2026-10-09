@@ -46,6 +46,8 @@ export interface Plan {
   reason?: string;
   /** Cells to lock once the plan is applied: what was asked for, so a later re-plan does not undo it. */
   pins: { staffId: string; date: string }[];
+  /** Ways out when the plan is red (filled in by the screen with `suggestFor`). */
+  suggestions?: import("./suggest").Suggestion[];
   /** An emergency change (absence): no notice period; the screen lists the people to call. */
   urgent?: boolean;
   /** How far ahead of the earliest affected day the request was made (needs `today`). */

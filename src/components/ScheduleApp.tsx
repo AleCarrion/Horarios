@@ -36,6 +36,7 @@ import { MobileTabBar } from "./MobileTabBar";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { PlanDialog } from "./PlanDialog";
 import { MonthSummary } from "./MonthSummary";
+import { suggestFor } from "@/lib/domain/suggest";
 import { HistoryPanel } from "./HistoryPanel";
 import { appendEntry, diffCells, type LogEntry } from "@/lib/domain/changeLog";
 import { readLog, writeLog } from "@/lib/changeLogStore";
@@ -96,7 +97,7 @@ export function ScheduleApp() {
 
   const [today, setToday] = useState<string | null>(null);
   const [locks, setLocks] = useState<Locks>({});
-  const [plan, setPlan] = useState<{ plan: Plan; title: string; request?: ShiftRequest } | null>(null);
+  const [plan, setPlan] = useState<{ plan: Plan; title: string; request?: ShiftRequest; retry?: (locked: Locks) => void } | null>(null);
   const [teamProposal, setTeamProposal] = useState<{ title: string; next: Staff[]; plans: MonthPlan[] } | null>(null);
   const [requests, setRequests] = useState<ShiftRequest[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -282,30 +283,34 @@ export function ScheduleApp() {
   };
 
   // --- day off / holidays requests: plan the whole month around them and show a preview first
-  const requestDays = (staffId: string, from: string, kind: "D" | "V" | "A" | "M" | "T" | "N", days: number) => {
+  /** Plans, adds the ways out when it does not fit, and shows the preview. `retry` re-opens it after the manager released some locks. */
+  const present = (title: string, ctx: RepairContext, run: (c: RepairContext) => Plan, retry: (locked: Locks) => void, request?: ShiftRequest) => {
+    const p = run(ctx);
+    setPlan({ plan: { ...p, suggestions: suggestFor(ctx, p, run) }, title, request, retry });
+  };
+  const requestDays = (staffId: string, from: string, kind: "D" | "V" | "A" | "M" | "T" | "N", days: number, lockedNow: Locks = locks) => {
     const person = staff.find((x) => x.id === staffId);
     const all = Object.keys(h.present[staffId] ?? {}).sort();
     const to = all[Math.min(all.indexOf(from) + days - 1, all.length - 1)] ?? from;
-    const ctx = { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: locks, rules };
-    const result = kind === "M" || kind === "T" || kind === "N" ? planShiftPref(ctx, staffId, from, to, kind) : kind === "A" ? planAbsence(ctx, staffId, from, to) : planDayOff(ctx, staffId, from, kind, to);
+    const ctx: RepairContext = { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: lockedNow, rules };
+    const run = (c: RepairContext) => (kind === "M" || kind === "T" || kind === "N" ? planShiftPref(c, staffId, from, to, kind) : kind === "A" ? planAbsence(c, staffId, from, to) : planDayOff(c, staffId, from, kind, to));
     const label = kind === "V" ? "Vacaciones" : kind === "A" ? "Ausencia imprevista" : kind === "D" ? "Libre solicitado" : `Turno pedido (${{ M: "mañanas", T: "tardes", N: "noches" }[kind]})`;
-    setPlan({
-      plan: result,
-      title: `${label} · ${person?.name} · ${Number(from.slice(8))}${to !== from ? `–${Number(to.slice(8))}` : ""} ${MONTHS[ym.month - 1].toLowerCase()}`,
-    });
+    present(`${label} · ${person?.name} · ${Number(from.slice(8))}${to !== from ? `–${Number(to.slice(8))}` : ""} ${MONTHS[ym.month - 1].toLowerCase()}`, ctx, run, (l) => requestDays(staffId, from, kind, days, l));
   };
-  const requestSwap = (a: string, b: string, date: string, returnDate?: string) => {
+  const requestSwap = (a: string, b: string, date: string, returnDate?: string, lockedNow: Locks = locks) => {
     const pa = staff.find((x) => x.id === a);
     const pb = staff.find((x) => x.id === b);
-    const result = planShiftSwap({ year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: locks, rules }, a, b, date, returnDate);
-    setPlan({
-      plan: result,
-      title: `Cambio de turno · ${pa?.name} ↔ ${pb?.name} · ${Number(date.slice(8))}${returnDate ? ` y ${Number(returnDate.slice(8))}` : ""} ${MONTHS[ym.month - 1].toLowerCase()}`,
-    });
+    const ctx: RepairContext = { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: lockedNow, rules };
+    present(
+      `Cambio de turno · ${pa?.name} ↔ ${pb?.name} · ${Number(date.slice(8))}${returnDate ? ` y ${Number(returnDate.slice(8))}` : ""} ${MONTHS[ym.month - 1].toLowerCase()}`,
+      ctx,
+      (c) => planShiftSwap(c, a, b, date, returnDate),
+      (l) => requestSwap(a, b, date, returnDate, l),
+    );
   };
-  const fixIssues = () => {
-    const result = planFix({ year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: locks, rules });
-    setPlan({ plan: result, title: `Arreglar avisos · ${MONTHS[ym.month - 1].toLowerCase()}` });
+  const fixIssues = (lockedNow: Locks = locks) => {
+    const ctx: RepairContext = { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: lockedNow, rules };
+    present(`Arreglar avisos · ${MONTHS[ym.month - 1].toLowerCase()}`, ctx, planFix, (l) => fixIssues(l));
   };
   /** Jump to the day an issue is about: right week, scrolled into view, highlighted. */
   const showIssue = (date: string, staffId?: string) => {
@@ -320,6 +325,19 @@ export function ScheduleApp() {
       void el.offsetWidth;
       el.classList.add("flash-cell");
     }, 80);
+  };
+  /** The manager accepts a suggestion: release those locked cells and plan again. */
+  const releaseAndRetry = (cells: { staffId: string; date: string }[]) => {
+    const month = (d: string) => `${d.slice(0, 4)}-${Number(d.slice(5, 7))}`;
+    const here = `${ym.year}-${ym.month}`;
+    const next = setLocked(locks, cells.filter((c) => month(c.date) === here), false);
+    setLocks(next);
+    writeLocks(ym.year, ym.month, next);
+    for (const key of new Set(cells.map((c) => month(c.date)).filter((k) => k !== here))) {
+      const [y, m] = key.split("-").map(Number);
+      writeLocks(y, m, setLocked(readLocks(y, m), cells.filter((c) => month(c.date) === key), false));
+    }
+    plan?.retry?.(next);
   };
   const applyPlan = () => {
     if (!plan) return;
@@ -361,12 +379,20 @@ export function ScheduleApp() {
     const { year, month } = requestMonth(r);
     return planForRequest(ctxFor(year, month), r);
   };
-  const reviewRequest = (r: ShiftRequest, p: Plan) => {
+  const reviewRequest = (r: ShiftRequest, p: Plan, lockedNow?: Locks) => {
     const { year, month } = requestMonth(r);
     setYm({ year, month }); // show the month the request is about
     setPanelOpen(false);
     const who = staff.find((x) => x.id === r.staffId)?.name;
-    setPlan({ plan: p, title: `${KIND_LABEL[r.kind]} · ${who} · ${Number(r.date.slice(8))}${r.endDate && r.endDate !== r.date ? `–${Number(r.endDate.slice(8))}` : ""} ${MONTHS[month - 1].toLowerCase()}`, request: r });
+    const ctx = { ...ctxFor(year, month), ...(lockedNow ? { locked: lockedNow } : {}) };
+    const run = (c: RepairContext) => planForRequest(c, r);
+    const shown = lockedNow ? run(ctx) : p;
+    setPlan({
+      plan: { ...shown, suggestions: suggestFor(ctx, shown, run) },
+      title: `${KIND_LABEL[r.kind]} · ${who} · ${Number(r.date.slice(8))}${r.endDate && r.endDate !== r.date ? `–${Number(r.endDate.slice(8))}` : ""} ${MONTHS[month - 1].toLowerCase()}`,
+      request: r,
+      retry: (l) => reviewRequest(r, p, l),
+    });
   };
   const rejectRequest = (r: ShiftRequest, note: string) => saveRequests(requests.map((x) => (x.id === r.id ? decide(x, "rejected", note) : x)));
 
@@ -660,7 +686,7 @@ export function ScheduleApp() {
                 {!readOnly && (
                   <button
                     type="button"
-                    onClick={fixIssues}
+                    onClick={() => fixIssues()}
                     className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white shadow transition hover:brightness-110 active:scale-95"
                   >
                     <SparklesIcon width={16} height={16} /> Arreglar avisos
@@ -789,7 +815,7 @@ export function ScheduleApp() {
           onCancel={() => setTeamProposal(null)}
         />
       )}
-      {plan && <PlanDialog plan={plan.plan} title={plan.title} staff={staff} onApply={applyPlan} onCancel={() => setPlan(null)} />}
+      {plan && <PlanDialog plan={plan.plan} title={plan.title} staff={staff} onApply={applyPlan} onCancel={() => setPlan(null)} onUnlock={releaseAndRetry} />}
     </>
   );
 }

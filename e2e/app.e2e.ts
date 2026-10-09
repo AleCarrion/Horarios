@@ -142,6 +142,32 @@ test("el historial recoge un cambio y permite volver atrás", async ({ page, vie
   await expect(cell).toHaveAttribute("aria-label", before!);
 });
 
+test("si no cuadra por casillas bloqueadas, propone desbloquearlas y al hacerlo cuadra", async ({ page, viewport }) => {
+  test.skip((viewport?.width ?? 1280) < 640, "la cuadrícula completa es de escritorio");
+  await open(page);
+  const day = await lateDay(page);
+  const key = await page.evaluate(() => {
+    const cells = [...document.querySelectorAll<HTMLElement>("[data-row][data-col]")];
+    const locks: Record<string, Record<string, boolean>> = {};
+    for (const c of cells) (locks[c.dataset.row!] ??= {})[c.dataset.col!] = true;
+    const first = cells[0].dataset.col!;
+    const k = `horarios:locks:${Number(first.slice(0, 4))}-${Number(first.slice(5, 7))}`;
+    return { k, locks };
+  });
+  const asked = page.locator(`[data-row][data-col="${day}"]`).nth(3);
+  const rowId = await asked.getAttribute("data-row");
+  delete key.locks[rowId!][day]; // the asked day itself is free; everything else is locked
+  await page.evaluate(({ k, locks }) => localStorage.setItem(k, JSON.stringify(locks)), key);
+  await page.reload();
+  await page.waitForSelector(".schedule-table");
+  await page.locator(`[data-row="${rowId}"][data-col="${day}"]`).click();
+  await page.getByRole("option", { name: /Libre/ }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Cómo conseguir que cuadre");
+  await dialog.getByRole("button", { name: "Desbloquear y recalcular" }).click();
+  await expect(dialog).toContainText("Se puede cuadrar sin problemas");
+});
+
 test("la página de equipo lista la plantilla", async ({ page }) => {
   await page.goto("/equipo");
   await expect(page.getByRole("heading", { name: "Equipo" })).toBeVisible();
