@@ -1,7 +1,7 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { isWeekend, monthDates, weekday } from "@/lib/domain/dates";
 import { isHoliday } from "@/lib/domain/holidays";
 import { allowedShifts } from "@/lib/domain/rules";
@@ -100,6 +100,14 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
     setMenu(null);
     opener.current?.focus();
   };
+
+  // the menu is taller than the estimate used to place it: slide it up until it fits on screen (phones centre it with CSS)
+  useLayoutEffect(() => {
+    const el = menuRef.current;
+    if (!menu || !el) return;
+    const r = el.getBoundingClientRect();
+    if (r.bottom > window.innerHeight - 8) el.style.top = `${Math.max(8, window.innerHeight - r.height - 8)}px`;
+  }, [menu]);
 
   useEffect(() => {
     if (!menu) return;
@@ -382,7 +390,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
             aria-label={`Turno de ${menu.staff.name}, ${menu.date}`}
             onKeyDown={onMenuKey}
             style={{ left: menu.x, top: menu.y }}
-            className="anim-menu fixed z-30 w-56 rounded-2xl border border-line bg-card-solid p-1.5 shadow-2xl max-sm:!inset-0 max-sm:m-auto max-sm:h-fit max-sm:max-h-[calc(100dvh-8rem)] max-sm:w-[calc(100%-2rem)] max-sm:overflow-y-auto max-sm:px-3 max-sm:py-3"
+            className="anim-menu fixed z-30 max-h-[calc(100dvh-1rem)] w-56 overflow-y-auto rounded-2xl border border-line bg-card-solid p-1.5 shadow-2xl max-sm:!inset-0 max-sm:m-auto max-sm:h-fit max-sm:max-h-[calc(100dvh-8rem)] max-sm:w-[calc(100%-2rem)] max-sm:overflow-y-auto max-sm:px-3 max-sm:py-3"
           >
             <div className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-muted">
               {menu.staff.name} · {Number(menu.date.slice(8))}

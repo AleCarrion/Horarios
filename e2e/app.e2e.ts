@@ -123,6 +123,25 @@ test("un mes publicado no se edita por accidente hasta reabrirlo", async ({ page
   await expect(page.getByRole("listbox")).toBeVisible();
 });
 
+test("el historial recoge un cambio y permite volver atrás", async ({ page, viewport }) => {
+  test.skip((viewport?.width ?? 1280) < 640, "la cuadrícula completa es de escritorio");
+  await open(page);
+  const day = await lateDay(page);
+  const cell = page.locator(`[data-row][data-col="${day}"]`).nth(3);
+  const before = await cell.getAttribute("aria-label");
+  await cell.click();
+  await page.getByRole("checkbox").uncheck();
+  await page.getByRole("option", { name: /Ausencia/ }).click();
+  await expect(cell).toHaveAttribute("aria-label", /Ausencia/);
+  await page.getByRole("button", { name: "Historial de cambios" }).first().click();
+  const panel = page.getByRole("dialog", { name: "Historial de cambios" });
+  await expect(panel).toContainText("Edición manual");
+  await panel.getByText("Edición manual").click();
+  await panel.getByRole("button", { name: /Volver a/ }).click();
+  await panel.getByRole("button", { name: "Cerrar" }).click();
+  await expect(cell).toHaveAttribute("aria-label", before!);
+});
+
 test("la página de equipo lista la plantilla", async ({ page }) => {
   await page.goto("/equipo");
   await expect(page.getByRole("heading", { name: "Equipo" })).toBeVisible();

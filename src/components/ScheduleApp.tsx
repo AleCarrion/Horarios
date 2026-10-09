@@ -28,7 +28,7 @@ import { useAuth } from "@/lib/useAuth";
 import { useRemoteSchedule } from "@/lib/useRemoteSchedule";
 import { AuthBar } from "./AuthBar";
 import { ExportMenu } from "./ExportMenu";
-import { ChevronLeft, ChevronRight, CheckIcon, DownloadIcon, InboxIcon, LockIcon, LogoMark, MoreIcon, PrinterIcon, TableIcon, RedoIcon, SparklesIcon, UndoIcon } from "./icons";
+import { ChevronLeft, ChevronRight, CheckIcon, ClockIcon, DownloadIcon, InboxIcon, LockIcon, LogoMark, MoreIcon, PrinterIcon, TableIcon, RedoIcon, SparklesIcon, UndoIcon } from "./icons";
 import { RequestsPanel } from "./RequestsPanel";
 import { ActionSheet, type SheetAction } from "./ActionSheet";
 import { AppNav } from "./AppNav";
@@ -36,6 +36,9 @@ import { MobileTabBar } from "./MobileTabBar";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { PlanDialog } from "./PlanDialog";
 import { MonthSummary } from "./MonthSummary";
+import { HistoryPanel } from "./HistoryPanel";
+import { appendEntry, diffCells, type LogEntry } from "@/lib/domain/changeLog";
+import { readLog, writeLog } from "@/lib/changeLogStore";
 import { DEFAULT_RULES, localHolidaysOf, type Rules } from "@/lib/domain/ruleset";
 import { readRules } from "@/lib/rulesStore";
 import { isMonthClosed, monthLabel, type MonthState } from "@/lib/domain/monthStatus";
@@ -76,9 +79,20 @@ function load(y: number, m: number): Schedule {
 export function ScheduleApp() {
   const now = new Date();
   const [ym, setYm] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
-  const [h, dispatch] = useReducer(reducer, undefined, () =>
+  const [h, rawDispatch] = useReducer(reducer, undefined, () =>
     createHistory(generateSchedule({ year: ym.year, month: ym.month, staff: DEFAULT_STAFF }).schedule),
   );
+
+  // Every change made by hand is written to this month's change log (what, who it touched, when), so it can be reviewed and undone cell by cell.
+  const lastAction = useRef<Action["type"] | null>(null);
+  const logLabel = useRef<string | null>(null);
+  const logBase = useRef<Schedule | null>(null);
+  const dispatch = (a: Action) => {
+    lastAction.current = a.type;
+    rawDispatch(a);
+  };
+  const [log, setLog] = useState<LogEntry[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const [today, setToday] = useState<string | null>(null);
   const [locks, setLocks] = useState<Locks>({});
@@ -174,6 +188,26 @@ export function ScheduleApp() {
   }, [h.present, h.changes.length, ym]);
 
 
+  useEffect(() => {
+    setLog(readLog(ym.year, ym.month)); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [ym]);
+  useEffect(() => {
+    const act = lastAction.current;
+    lastAction.current = null;
+    const base = logBase.current;
+    logBase.current = h.present;
+    if (!act || !base || act === "reset" || act === "remote") return;
+    const cells = diffCells(base, h.present);
+    if (!cells.length) return;
+    const label = logLabel.current ?? { edit: "Edición manual", undo: "Deshacer", redo: "Rehacer", replace: "Cambio automático" }[act];
+    logLabel.current = null;
+    setLog((cur) => {
+      const next = appendEntry(cur, { at: new Date().toISOString(), label, cells });
+      writeLog(ym.year, ym.month, next);
+      return next;
+    });
+  }, [h.present, ym]);
+
   const shown = plan?.plan.schedule ?? h.present; // while a request is previewed the grid shows it
   const validation = useMemo(
     () => validateSchedule(shown, visible, ym.year, ym.month, history, rules),
@@ -208,6 +242,7 @@ export function ScheduleApp() {
       }
     }
     const night = list.find((p) => p.role === "night_auditor");
+    logLabel.current = "Generar automático";
     dispatch({
       type: "replace",
       schedule: generateSchedule({
@@ -289,6 +324,7 @@ export function ScheduleApp() {
   const applyPlan = () => {
     if (!plan) return;
     if (plan.request) saveRequests(requests.map((x) => (x.id === plan.request!.id ? decide(x, "approved") : x)));
+    logLabel.current = plan.title;
     dispatch({ type: "replace", schedule: plan.plan.schedule });
     if (plan.plan.pins.length) {
       // what was asked for (and approved) stays as decided
@@ -403,6 +439,7 @@ export function ScheduleApp() {
     { label: "Guardar copia de seguridad", hint: "Descarga todo: equipo, meses, solicitudes y bloqueos", icon: <DownloadIcon />, onClick: saveBackup },
     ...(remoteReadOnly ? [] : [{ label: "Restaurar copia de seguridad", icon: <DownloadIcon />, onClick: () => restoreInput.current?.click() }]),
     ...(remote.draft ? [{ label: "Publicar mes", icon: <DownloadIcon />, onClick: () => void remote.publish() }] : []),
+    { label: "Historial de cambios", icon: <ClockIcon />, onClick: () => setHistoryOpen(true) },
     { label: "Generar automático", hint: "Rehace el calendario del mes", icon: <SparklesIcon />, onClick: () => setConfirmRegenerate(true), disabled: readOnly, tone: "accent" as const },
   ];
 
@@ -463,6 +500,9 @@ export function ScheduleApp() {
             </button>
             <button className={iconBtn} onClick={() => dispatch({ type: "redo" })} disabled={readOnly || !h.future.length} aria-label="Rehacer" title="Rehacer">
               <RedoIcon />
+            </button>
+            <button className={iconBtn} onClick={() => setHistoryOpen(true)} aria-label="Historial de cambios" title="Historial de cambios">
+              <ClockIcon />
             </button>
             <button
               onClick={() => setPanelOpen(true)}
@@ -652,6 +692,22 @@ export function ScheduleApp() {
 
       </main>
       <MobileTabBar pending={requests.filter((r) => r.status === "pending").length} onRequests={() => setPanelOpen(true)} />
+      <HistoryPanel
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        log={log}
+        staff={staff}
+        schedule={h.present}
+        disabled={readOnly}
+        onRestore={(c) => {
+          logLabel.current = "Restaurado desde el historial";
+          dispatch({ type: "edit", edits: [{ staffId: c.staffId, date: c.date, to: c.from! }] });
+          // going back to what it was also releases the lock the manual edit put on the cell
+          const next = setLocked(locks, [{ staffId: c.staffId, date: c.date }], false);
+          setLocks(next);
+          writeLocks(ym.year, ym.month, next);
+        }}
+      />
       <ActionSheet open={sheetOpen} onClose={() => setSheetOpen(false)} actions={sheetActions} />
       <RequestsPanel
         open={panelOpen}
