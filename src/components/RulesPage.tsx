@@ -7,7 +7,7 @@ import { readRules, writeRules } from "@/lib/rulesStore";
 import { remoteConfigured } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
 import { useRemoteRules } from "@/lib/useRemoteRules";
-import { AuthBar } from "./AuthBar";
+import { AccountChip } from "./AccountChip";
 import { AppNav } from "./AppNav";
 import { LogoMark, PlusIcon, TrashIcon } from "./icons";
 import { MobileTabBar } from "./MobileTabBar";
@@ -84,11 +84,11 @@ export function RulesPage() {
             </div>
           </div>
           <div className="max-sm:hidden"><AppNav /></div>
+          {remoteConfigured && <div className="ml-auto"><AccountChip auth={auth} status={readOnly ? "readonly" : "synced"} /></div>}
         </div>
       </header>
 
       <main className="mx-auto w-full min-w-0 max-w-[820px] space-y-5 p-4">
-        {remoteConfigured && <AuthBar auth={auth} status={readOnly ? "readonly" : "synced"} />}
         <div className="anim-fade-up">
           <h2 className="text-xl font-bold tracking-tight sm:text-2xl">Reglas del horario</h2>
           <p className="mt-1 max-w-xl text-sm text-muted">

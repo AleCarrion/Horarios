@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { isRecovery, setRecovery } from "./session";
 import { getSupabase } from "./supabase";
 
 export interface AuthState {
@@ -28,10 +29,11 @@ export function useAuth(): AuthState {
   const [email, setEmail] = useState<string | null>(null);
   const [isEditor, setIsEditor] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [recovery, setRecovery] = useState(false);
+  const [recovery, setRecoveryState] = useState(false);
 
   useEffect(() => {
     if (!sb) return;
+    if (isRecovery()) setRecoveryState(true); // eslint-disable-line react-hooks/set-state-in-effect
     const apply = async (userId: string | undefined, mail: string | undefined) => {
       setEmail(mail ?? null);
       if (!userId) {
@@ -54,7 +56,10 @@ export function useAuth(): AuthState {
     };
     sb.auth.getSession().then(({ data }) => apply(data.session?.user.id, data.session?.user.email));
     const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY") setRecovery(true);
+      if (event === "PASSWORD_RECOVERY") {
+        setRecovery(true); // survives the move to the sign-in page
+        setRecoveryState(true);
+      }
       void apply(session?.user.id, session?.user.email);
     });
     return () => sub.subscription.unsubscribe();
@@ -99,7 +104,10 @@ export function useAuth(): AuthState {
     async (password: string) => {
       if (!sb) return "Supabase no configurado";
       const { error } = await sb.auth.updateUser({ password });
-      if (!error) setRecovery(false);
+      if (!error) {
+        setRecovery(false);
+        setRecoveryState(false);
+      }
       return error ? error.message : null;
     },
     [sb],

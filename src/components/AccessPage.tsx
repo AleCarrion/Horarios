@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from "react";
 import { inviteEmail, isEmail, loadAccess, revoke, setRole, type AccessEntry, type Role } from "@/lib/accessAdmin";
 import { remoteConfigured } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
-import { AuthBar } from "./AuthBar";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { LogoMark, PlusIcon, TrashIcon } from "./icons";
 
@@ -62,7 +61,6 @@ export function AccessPage() {
       </header>
 
       <main className="mx-auto w-full min-w-0 max-w-[720px] space-y-5 p-4">
-        {remoteConfigured && <AuthBar auth={auth} status={auth.isEditor ? "synced" : "readonly"} />}
         <div className="anim-fade-up">
           <h2 className="text-xl font-bold tracking-tight sm:text-2xl">Accesos</h2>
           <p className="mt-1 max-w-xl text-sm text-muted">
@@ -75,7 +73,7 @@ export function AccessPage() {
         ) : !auth.ready ? (
           <p className="text-sm text-muted">Cargando…</p>
         ) : !auth.email ? (
-          <p className="glass rounded-2xl p-5 text-sm">Entra con tu correo (arriba) para gestionar los accesos.</p>
+          <p className="glass rounded-2xl p-5 text-sm"><Link href="/entrar" className="font-semibold text-brand underline">Entra con tu correo</Link> para gestionar los accesos.</p>
         ) : !auth.isAdmin ? (
           <p className="glass rounded-2xl p-5 text-sm">Solo la persona administradora puede cambiar los accesos. {auth.isEditor ? "Tú puedes editar el horario, pero no invitar a nadie." : "Ahora mismo tu cuenta solo puede ver el horario."}</p>
         ) : (

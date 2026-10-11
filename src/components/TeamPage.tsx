@@ -10,7 +10,7 @@ import { remoteConfigured } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
 import { useTeam } from "@/lib/useTeam";
 import { useEffect } from "react";
-import { AuthBar } from "./AuthBar";
+import { AccountChip } from "./AccountChip";
 import { AppNav } from "./AppNav";
 import { MobileTabBar } from "./MobileTabBar";
 import { readRequests } from "@/lib/requestsStore";
@@ -250,11 +250,11 @@ export function TeamPage() {
             </div>
           </div>
           <div className="max-sm:hidden"><AppNav /></div>
+          {remoteConfigured && <div className="ml-auto"><AccountChip auth={auth} status={readOnly ? "readonly" : pending ? "pending" : "synced"} /></div>}
         </div>
       </header>
 
       <main className="mx-auto w-full min-w-0 max-w-[1200px] space-y-5 p-4">
-        {remoteConfigured && <AuthBar auth={auth} status={readOnly ? "readonly" : pending ? "pending" : "synced"} />}
 
         <div className="anim-fade-up flex flex-wrap items-end justify-between gap-3">
           <div>

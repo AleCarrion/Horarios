@@ -26,9 +26,10 @@ import { toCSV, toICS } from "@/lib/export";
 import { remoteConfigured } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
 import { useRemoteSchedule } from "@/lib/useRemoteSchedule";
-import { AuthBar } from "./AuthBar";
+import { AccountChip } from "./AccountChip";
+import { useRouter } from "next/navigation";
 import { ExportMenu } from "./ExportMenu";
-import { ChevronLeft, ChevronRight, CheckIcon, ClockIcon, DownloadIcon, InboxIcon, LockIcon, LogoMark, MoreIcon, PrinterIcon, TableIcon, RedoIcon, SparklesIcon, UndoIcon } from "./icons";
+import { ChevronLeft, ChevronRight, CheckIcon, ClockIcon, DownloadIcon, InboxIcon, LockIcon, LogoMark, MoreIcon, PrinterIcon, TableIcon, RedoIcon, SparklesIcon, UndoIcon, UsersIcon } from "./icons";
 import { RequestsPanel } from "./RequestsPanel";
 import { ActionSheet, type SheetAction } from "./ActionSheet";
 import { AppNav } from "./AppNav";
@@ -122,6 +123,7 @@ export function ScheduleApp() {
   }, []);
 
   const auth = useAuth();
+  const router = useRouter();
   const team = useTeam(auth);
   const staff = team.staff;
 
@@ -484,6 +486,7 @@ export function ScheduleApp() {
     { label: "Guardar copia de seguridad", hint: "Descarga todo: equipo, meses, solicitudes y bloqueos", icon: <DownloadIcon />, onClick: saveBackup },
     ...(remoteReadOnly ? [] : [{ label: "Restaurar copia de seguridad", icon: <DownloadIcon />, onClick: () => restoreInput.current?.click() }]),
     ...(remote.draft ? [{ label: "Publicar mes", icon: <DownloadIcon />, onClick: () => void remote.publish() }] : []),
+    ...(remoteConfigured ? [{ label: auth.email ? `Mi cuenta (${auth.email})` : "Entrar", icon: <UsersIcon />, onClick: () => router.push(auth.email ? "/cuenta" : "/entrar") }] : []),
     { label: "Historial de cambios", icon: <ClockIcon />, onClick: () => setHistoryOpen(true) },
     { label: "Generar automático", hint: "Rehace el calendario del mes", icon: <SparklesIcon />, onClick: () => setConfirmRegenerate(true), disabled: readOnly, tone: "accent" as const },
   ];
@@ -579,13 +582,12 @@ export function ScheduleApp() {
               <SparklesIcon width={16} height={16} className="transition-transform group-hover:rotate-12 group-hover:scale-125" />
               Generar<span className="hidden sm:inline"> automático</span>
             </button>
+            {remoteConfigured && <AccountChip auth={auth} status={(team.pending || requestsRemote.pending || locksRemote.pending) && remote.status === "synced" ? "pending" : remote.status} />}
           </div>
         </div>
       </header>
 
       <main className="mx-auto w-full min-w-0 max-w-[1500px] space-y-4 p-4">
-        {remoteConfigured && <AuthBar auth={auth} status={(team.pending || requestsRemote.pending || locksRemote.pending) && remote.status === "synced" ? "pending" : remote.status} />}
-
         <StatCards coveragePct={stats.pct} covered={stats.covered} total={stats.total} issues={validation.issues.length} people={stats.people} />
 
         <h2 className="hidden text-lg font-bold print:block">

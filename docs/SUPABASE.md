@@ -20,6 +20,8 @@ estado de cada mes se comparten entre tus dispositivos (móvil y ordenador) y qu
 
 (Proyectos creados antes de la migración 0007: ejecuta `supabase/migrations/0007_admin_access.sql` en el SQL editor. Si ya tenías a alguien en `editors`, esa persona sigue pudiendo editar; para administrar accesos, la primera en entrar tras la migración sin ser editora no obtiene nada, así que en ese caso usa `supabase/add_editor.sql` con `role = 'admin'`.)
 
+**Pantallas de acceso:** con Supabase conectado, la app abre en una pantalla de **Entrar** (correo y contraseña). Quien solo quiera mirar puede pulsar «Solo quiero ver el horario». Arriba a la derecha hay un círculo con tu inicial: lleva a **Mi cuenta** (quién eres, permisos, estado de sincronización, cambiar contraseña, cerrar sesión y, si eres administradora, **Gestionar accesos**). En el móvil está en el menú «⋯». Sin Supabase (modo local) no hay pantalla de entrada.
+
 ## 2. Conectar la app
 
 - En local: copia `.env.example` a `.env.local` y rellena `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`.

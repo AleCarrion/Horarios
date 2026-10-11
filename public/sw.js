@@ -1,7 +1,7 @@
 // Offline-first service worker. Bump VERSION to invalidate old caches.
-const VERSION = "v4";
+const VERSION = "v5";
 const CACHE = `horarios-${VERSION}`;
-const PRECACHE = ["/", "/equipo", "/reglas", "/acceso", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png", "/manifest.webmanifest"];
+const PRECACHE = ["/", "/equipo", "/reglas", "/acceso", "/entrar", "/cuenta", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));

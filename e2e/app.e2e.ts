@@ -168,6 +168,15 @@ test("si no cuadra por casillas bloqueadas, propone desbloquearlas y al hacerlo 
   await expect(dialog).toContainText("Se puede cuadrar sin problemas");
 });
 
+test("sin Supabase no hay pantalla de entrada: /entrar vuelve al horario y /cuenta lo explica", async ({ page }) => {
+  await page.goto("/entrar");
+  await page.waitForSelector(".schedule-table");
+  await expect(page).toHaveURL(/\/$/);
+  await page.goto("/cuenta");
+  await expect(page.getByRole("heading", { name: "Mi cuenta" })).toBeVisible();
+  await expect(page.getByText("modo local")).toBeVisible();
+});
+
 test("la página de equipo lista la plantilla", async ({ page }) => {
   await page.goto("/equipo");
   await expect(page.getByRole("heading", { name: "Equipo" })).toBeVisible();
