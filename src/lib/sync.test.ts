@@ -49,3 +49,22 @@ describe("applyRemote", () => {
     expect(h.present.a["2026-10-02"]).toBe("N");
   });
 });
+
+import { isMissingFunction, withoutAt } from "./sync";
+
+describe("guardado sin pisar cambios", () => {
+  it("coalesce keeps the timestamp of the last edit of a cell", () => {
+    const rows = coalesce([
+      { staff_id: "a", day: "2026-10-01", shift_code: "M", at: "1" },
+      { staff_id: "a", day: "2026-10-01", shift_code: "T", at: "2" },
+    ]);
+    expect(rows).toEqual([{ staff_id: "a", day: "2026-10-01", shift_code: "T", at: "2" }]);
+  });
+  it("detects a server that lacks the function (old migrations) and strips the client timestamp", () => {
+    expect(isMissingFunction({ code: "PGRST202" })).toBe(true);
+    expect(isMissingFunction({ message: "Could not find the function public.apply_cells" })).toBe(true);
+    expect(isMissingFunction({ code: "42501", message: "permission denied" })).toBe(false);
+    expect(isMissingFunction(null)).toBe(false);
+    expect(withoutAt([{ staff_id: "a", day: "d", shift_code: "M", at: "x" }])).toEqual([{ staff_id: "a", day: "d", shift_code: "M" }]);
+  });
+});

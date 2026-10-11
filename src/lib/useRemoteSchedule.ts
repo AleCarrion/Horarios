@@ -5,7 +5,7 @@ import { daysInMonth, toISO } from "./domain/dates";
 import type { Schedule, ShiftCode } from "./domain/types";
 import { clearScheduleCache, nextMonth, prevMonth, storageKey } from "./monthStore";
 import { getSupabase, remoteConfigured } from "./supabase";
-import { coalesce, diffSchedules, rowsToSchedule, scheduleToRows, type Row } from "./sync";
+import { coalesce, diffSchedules, isMissingFunction, rowsToSchedule, scheduleToRows, withoutAt, type Row } from "./sync";
 import type { AuthState } from "./useAuth";
 
 const QUEUE_KEY = "horarios:queue";
@@ -40,6 +40,7 @@ export function useRemoteSchedule({ year, month, present, auth, onLoaded, onRemo
   const [unpublished, setUnpublished] = useState(false);
   const [pending, setPending] = useState(() => (typeof window === "undefined" ? 0 : readQueue().length));
   const [loaded, setLoaded] = useState("");
+  const [conflicts, setConflicts] = useState(0);
   const key = `${year}-${month}`;
   const base = useRef<Schedule>({});
   const presentRef = useRef(present);
@@ -55,8 +56,22 @@ export function useRemoteSchedule({ year, month, present, auth, onLoaded, onRemo
     if (!sb || !canEdit) return;
     const sent = readQueue();
     if (!sent.length) return setPending(0);
-    const { error } = await sb.from("monthly_schedule").upsert(sent, { onConflict: "staff_id,day" });
+    // Saved cell by cell: a cell another device changed after this edit keeps the newer value and comes back as a "conflict".
+    const first = await sb.rpc("apply_cells", { cells: sent });
+    let error = first.error;
+    let rejected = (first.data ?? []) as Row[];
+    if (isMissingFunction(error)) {
+      error = (await sb.from("monthly_schedule").upsert(withoutAt(sent), { onConflict: "staff_id,day" })).error;
+      rejected = [];
+    }
     if (error) return setPending(sent.length);
+    if (rejected.length) {
+      for (const r of rejected) {
+        base.current = { ...base.current, [r.staff_id]: { ...base.current[r.staff_id], [r.day]: r.shift_code } };
+        cb.current.onRemoteCell(r);
+      }
+      setConflicts((c) => c + rejected.length);
+    }
     // keep anything enqueued while the request was in flight
     const same = (a: Row, b: Row) => a.staff_id === b.staff_id && a.day === b.day && a.shift_code === b.shift_code;
     const rest = readQueue().filter((r) => !sent.some((s) => same(s, r)));
@@ -133,7 +148,8 @@ export function useRemoteSchedule({ year, month, present, auth, onLoaded, onRemo
   // Local edits (including undo/redo/regenerate) -> queue -> Supabase.
   useEffect(() => {
     if (!canEdit || draft || loaded !== key) return;
-    const rows = diffSchedules(base.current, present);
+    const at = new Date().toISOString();
+    const rows = diffSchedules(base.current, present).map((r) => ({ ...r, at }));
     if (!rows.length) return;
     base.current = present;
     const q = coalesce([...readQueue(), ...rows]);
@@ -175,7 +191,7 @@ export function useRemoteSchedule({ year, month, present, auth, onLoaded, onRemo
           ? "pending"
           : "synced";
 
-  return { status, canEdit, draft, unpublished, publish } as const;
+  return { status, canEdit, draft, unpublished, publish, conflicts, clearConflicts: () => setConflicts(0) } as const;
 }
 
 export type { ShiftCode };

@@ -17,13 +17,13 @@ npm test           # generador, validación, exportación, sincronización
 
 ## Configurar Supabase
 
-1. Crea un proyecto y ejecuta, por este orden, `supabase/migrations/0001_init.sql`, `supabase/migrations/0002_staff_order.sql`, `supabase/migrations/0003_requests_locks.sql`, `supabase/migrations/0004_request_shift.sql`, `supabase/migrations/0005_absence_shift.sql` y `supabase/seed.sql` (SQL editor).
+Guía completa en [`docs/SUPABASE.md`](docs/SUPABASE.md). En resumen:
+
+1. Crea un proyecto y pega `supabase/setup_all.sql` en el SQL editor (migraciones 0001–0006 + datos iniciales; se regenera con `npm run db:bundle`).
 2. En *Authentication → URL configuration* añade la URL de la app (y `http://localhost:3000`) como redirect.
 3. Copia `.env.example` a `.env.local` y rellena la URL y la clave *anon*.
-4. Inicia sesión una vez con el correo de la jefa (enlace mágico) y ejecuta en el SQL editor:
-   `insert into public.editors (user_id) select id from auth.users where email = 'correo@de.la.jefa';`
-5. Abre un mes sin publicar: aparece como **borrador**; pulsa *Publicar mes* para guardarlo.
-   A partir de ahí cada cambio se sincroniza solo.
+4. Entra una vez con el correo de la jefa y ejecuta `supabase/add_editor.sql` con su correo.
+5. En la primera conexión, la app pregunta qué hacer con los datos del dispositivo (subirlos o descartarlos).
 
 En Vercel define las mismas dos variables en *Project Settings → Environment Variables*.
 

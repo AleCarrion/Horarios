@@ -70,7 +70,7 @@ Leyenda: **S** = menos de medio día · **M** = 1–2 días · **L** = varios d�
 
 ## 3. Plan por fases
 
-> **Estado:** la **Fase A está completada** (A1–A11): copia de seguridad, estado del mes, historial, ausencia imprevista, resumen mensual, reglas y festivos editables, sugerencias cuando algo no cuadra, páginas de error, aviso de versión nueva, cabeceras de seguridad, CI y 15 pruebas de pantalla. Siguiente: Fase B (Supabase).
+> **Estado:** la **Fase A está completada** (A1–A11): copia de seguridad, estado del mes, historial, ausencia imprevista, resumen mensual, reglas y festivos editables, sugerencias cuando algo no cuadra, páginas de error, aviso de versión nueva, cabeceras de seguridad, CI y 15 pruebas de pantalla. **Fase B** (Supabase): hecho todo lo que se puede hacer y probar sin un proyecto real (B2–B8, ver `docs/SUPABASE.md`); falta solo crear el proyecto (B1), que es un paso tuyo de ~10 minutos.
 
 
 ### Fase A — Antes de tocar Supabase (terminar de pulir la app, sin restringir el acceso) · 🔴

@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import { DEFAULT_RULES, isHolidayEntry, normalizeRules, type Rules } from "@/lib/domain/ruleset";
 import { readRequests } from "@/lib/requestsStore";
 import { readRules, writeRules } from "@/lib/rulesStore";
+import { remoteConfigured } from "@/lib/supabase";
+import { useAuth } from "@/lib/useAuth";
+import { useRemoteRules } from "@/lib/useRemoteRules";
+import { AuthBar } from "./AuthBar";
 import { AppNav } from "./AppNav";
 import { LogoMark, PlusIcon, TrashIcon } from "./icons";
 import { MobileTabBar } from "./MobileTabBar";
@@ -37,6 +41,12 @@ export function RulesPage() {
   const [date, setDate] = useState("");
   const [yearly, setYearly] = useState(true);
   const [saved, setSaved] = useState(false);
+  const auth = useAuth();
+  const readOnly = remoteConfigured && !auth.isEditor;
+  const remoteRules = useRemoteRules(auth, (r) => {
+    setRules(r);
+    writeRules(r);
+  });
 
   useEffect(() => {
     setRules(readRules()); // eslint-disable-line react-hooks/set-state-in-effect
@@ -44,9 +54,11 @@ export function RulesPage() {
   }, []);
 
   const change = (patch: Partial<Rules>) => {
+    if (readOnly) return;
     const next = normalizeRules({ ...rules, ...patch });
     setRules(next);
     writeRules(next);
+    void remoteRules.save(next);
     setSaved(true);
   };
   const addHoliday = () => {
@@ -76,6 +88,7 @@ export function RulesPage() {
       </header>
 
       <main className="mx-auto w-full min-w-0 max-w-[820px] space-y-5 p-4">
+        {remoteConfigured && <AuthBar auth={auth} status={readOnly ? "readonly" : "synced"} />}
         <div className="anim-fade-up">
           <h2 className="text-xl font-bold tracking-tight sm:text-2xl">Reglas del horario</h2>
           <p className="mt-1 max-w-xl text-sm text-muted">
@@ -83,6 +96,7 @@ export function RulesPage() {
           </p>
         </div>
 
+        <fieldset disabled={readOnly} className="contents">
         <section aria-label="Descansos y rachas" className="space-y-3">
           <Stepper label="Máximo de días libres seguidos" hint="Más de esto sale como aviso (los mozos y las vacaciones no cuentan)." value={rules.maxRestRun} min={1} max={7} onChange={(n) => change({ maxRestRun: n })} />
           <Stepper label="Máximo de días trabajados seguidos" hint="Por encima de esto, aviso. El generador solo llega aquí si no puede cubrir un turno de otra forma." value={rules.maxWorkRun} min={3} max={10} onChange={(n) => change({ maxWorkRun: n })} />
@@ -126,9 +140,11 @@ export function RulesPage() {
           </div>
         </section>
 
+        </fieldset>
+
         <div className="flex items-center justify-between gap-3">
           <p role="status" className="text-sm font-semibold text-emerald-600">{saved ? "Guardado" : ""}</p>
-          <button type="button" disabled={isDefault} onClick={() => change(DEFAULT_RULES)} className="rounded-xl border border-line px-4 py-2 text-sm font-semibold transition hover:bg-brand/10 disabled:opacity-40">
+          <button type="button" disabled={isDefault || readOnly} onClick={() => change(DEFAULT_RULES)} className="rounded-xl border border-line px-4 py-2 text-sm font-semibold transition hover:bg-brand/10 disabled:opacity-40">
             Volver a las reglas del hotel
           </button>
         </div>

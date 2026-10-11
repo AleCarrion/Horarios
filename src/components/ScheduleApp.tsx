@@ -38,12 +38,16 @@ import { PlanDialog } from "./PlanDialog";
 import { MonthSummary } from "./MonthSummary";
 import { suggestFor } from "@/lib/domain/suggest";
 import { HistoryPanel } from "./HistoryPanel";
+import { LinkData } from "./LinkData";
 import { appendEntry, diffCells, type LogEntry } from "@/lib/domain/changeLog";
 import { readLog, writeLog } from "@/lib/changeLogStore";
 import { DEFAULT_RULES, localHolidaysOf, type Rules } from "@/lib/domain/ruleset";
 import { readRules } from "@/lib/rulesStore";
 import { isMonthClosed, monthLabel, type MonthState } from "@/lib/domain/monthStatus";
 import { readMonthState, writeMonthState } from "@/lib/monthStatusStore";
+import { useRemoteMonthState } from "@/lib/useRemoteMonthState";
+import { useRemoteRules } from "@/lib/useRemoteRules";
+import { writeRules } from "@/lib/rulesStore";
 import { ScheduleGrid } from "./ScheduleGrid";
 import { StatCards } from "./StatCards";
 
@@ -141,9 +145,24 @@ export function ScheduleApp() {
   const label = monthLabel(monthState, ym.year, ym.month, today);
   const closed = isMonthClosed(monthState, ym.year, ym.month, today);
   const readOnly = remoteReadOnly || closed;
+  const monthRemote = useRemoteMonthState({
+    auth,
+    year: ym.year,
+    month: ym.month,
+    onRemote: (s) => {
+      setMonthState(s);
+      writeMonthState(ym.year, ym.month, s);
+    },
+  });
+  useRemoteRules(auth, (r) => {
+    setRules(r);
+    writeRules(r);
+  });
   const setState = (s: MonthState | null) => {
     setMonthState(s);
     writeMonthState(ym.year, ym.month, s);
+    void monthRemote.save(s);
+    if (s?.state === "published" && remote.draft) void remote.publish(); // the first publication also uploads the month
   };
 
   const weeks = useMemo(() => weeksOf(monthDates(ym.year, ym.month)), [ym]);
@@ -583,7 +602,16 @@ export function ScheduleApp() {
           ))}
         </ul>
 
-        {!remoteConfigured && (
+        {remote.conflicts > 0 && (
+          <p role="status" className="glass anim-fade-up flex flex-wrap items-center gap-x-3 rounded-xl border-amber-400/60 px-3 py-2 text-sm print:hidden">
+            <span className="min-w-0 flex-1">
+              Se han mantenido {remote.conflicts} cambio{remote.conflicts === 1 ? "" : "s"} más reciente{remote.conflicts === 1 ? "" : "s"} hecho{remote.conflicts === 1 ? "" : "s"} desde otro dispositivo; lo tuyo en esas casillas no se ha guardado.
+            </span>
+            <button onClick={remote.clearConflicts} className="font-semibold text-brand underline-offset-2 hover:underline">Entendido</button>
+          </p>
+        )}
+
+        {(!remoteConfigured || auth.ready) && (
           <p className={`glass anim-fade-up flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-3 py-2 text-sm print:hidden ${closed ? "border-amber-400/60" : ""}`}>
             <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${closed ? "bg-amber-400/30 text-amber-900 dark:text-amber-200" : "bg-brand/10 text-brand"}`}>
               {{ draft: "Borrador", published: "Publicado", past: "Mes cerrado", reopened: "Reabierto" }[label]}
@@ -594,7 +622,7 @@ export function ScheduleApp() {
               {label === "reopened" && "Abierto para corregir algo. Vuelve a publicarlo cuando termines."}
               {label === "draft" && "Todavía lo estás preparando. Publícalo cuando esté listo."}
             </span>
-            {closed ? (
+            {remoteReadOnly ? null : closed ? (
               <button onClick={() => setState({ state: "reopened", at: new Date().toISOString() })} className="font-semibold text-brand underline-offset-2 hover:underline">Reabrir para editar</button>
             ) : (
               <button onClick={() => setState({ state: "published", at: new Date().toISOString() })} className="font-semibold text-brand underline-offset-2 hover:underline">Publicar mes</button>
@@ -718,6 +746,7 @@ export function ScheduleApp() {
 
       </main>
       <MobileTabBar pending={requests.filter((r) => r.status === "pending").length} onRequests={() => setPanelOpen(true)} />
+      <LinkData auth={auth} />
       <HistoryPanel
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
