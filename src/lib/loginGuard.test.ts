@@ -14,3 +14,20 @@ describe("enlace de acceso", () => {
     expect(friendlyAuthError("weird")).toMatch(/weird/);
   });
 });
+
+import { passwordProblem } from "./loginGuard";
+
+describe("contraseña", () => {
+  it("asks for 8 characters with letters and a number", () => {
+    expect(passwordProblem("abc1")).toMatch(/al menos 8/);
+    expect(passwordProblem("abcdefgh")).toMatch(/número/);
+    expect(passwordProblem("12345678")).toMatch(/letras/);
+    expect(passwordProblem("hotel1800")).toBeNull();
+  });
+  it("explains the usual login errors", () => {
+    expect(friendlyAuthError("Invalid login credentials")).toMatch(/incorrectos/);
+    expect(friendlyAuthError("Email not confirmed")).toMatch(/confirmado/);
+    expect(friendlyAuthError("User already registered")).toMatch(/ya tiene cuenta/);
+    expect(friendlyAuthError("Password should be at least 6 characters")).toMatch(/débil/);
+  });
+});

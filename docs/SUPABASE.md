@@ -12,7 +12,7 @@ estado de cada mes se comparten entre tus dispositivos (móvil y ordenador) y qu
 2. **SQL editor → New query**, pega **todo** el contenido de `supabase/setup_all.sql` y pulsa *Run*. Debe terminar sin errores.
    (Es la suma de las migraciones 0001–0007 y los datos iniciales. Si cambias una migración, regenera con `npm run db:bundle`.)
 3. **Authentication → URL configuration**: en *Site URL* pon la dirección de la app en Vercel y añade como *Redirect URL* esa misma dirección y `http://localhost:3000`.
-4. **Authentication → Providers → Email**: deja activado el enlace mágico (*Magic link*). Desactiva «Confirm email» si te lo pide; no se usan contraseñas.
+4. **Authentication → Sign In / Providers → Email**: déjalo activado (acceso con correo y contraseña). Para que crear cuenta sea inmediato, desactiva **Confirm email** (así no hace falta confirmar por correo; las personas invitadas ya las controlas tú desde *Accesos*). Si lo dejas activado, al crear la cuenta llega un correo con un enlace de confirmación. La opción de «entrar con enlace» y «he olvidado la contraseña» funcionan en ambos casos.
 5. **No desactives** *Allow new users to sign up*: las personas que invites necesitan poder entrar por primera vez. Quien entre sin estar invitado puede ver el horario (como cualquiera), pero no editar nada.
 6. **Project settings → API**: copia la *Project URL* y la clave *anon public*.
 7. **Entra tú primero** en la app con tu correo (te llega un enlace). La primera persona que entra tras montar la base de datos se queda como **administradora**, así que hazlo enseguida, antes de dar la dirección a nadie.
@@ -63,7 +63,7 @@ Para probar cambios sin tocar los datos reales: crea un **segundo proyecto** de 
 - guardar casillas no pisa cambios más recientes de otro dispositivo;
 - el proyecto nuevo se configura de una vez con `setup_all.sql`.
 
-Otras medidas: enlace mágico sin contraseñas, espera de 60 s entre enlaces pedidos, y mensajes de error claros si se pide demasiado.
+Otras medidas: contraseña de al menos 8 caracteres con letras y números, espera de 60 s entre correos pedidos, y mensajes de error claros si se pide demasiado.
 En *Authentication → Rate limits* puedes bajar el límite de correos por hora.
 
 ## 8. Si algo falla
@@ -71,6 +71,7 @@ En *Authentication → Rate limits* puedes bajar el límite de correos por hora.
 | Síntoma | Causa probable | Solución |
 |---|---|---|
 | «Solo lectura» al entrar la jefa | Su correo no está invitado | Que la administradora lo añada en **Accesos** |
+| «Correo o contraseña incorrectos» | Escrita mal, o aún no has creado la cuenta | Pulsa «Crear cuenta» la primera vez, o «He olvidado la contraseña» |
 | No llega el enlace | Correo mal escrito o límite de envíos | Espera unos minutos; revisa *Authentication → Logs* |
 | El enlace lleva a una página que no es la app | *Site URL / Redirect URL* mal puestas | Paso 1.3 |
 | Cambios «pendientes de enviar» que no se envían | Sin internet o sin permiso | Se reintenta cada 30 s; si es permiso, comprueba `editors` |

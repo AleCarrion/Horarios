@@ -9,7 +9,16 @@ export interface AuthState {
   isEditor: boolean;
   /** Can invite and remove other editors (see /acceso). */
   isAdmin: boolean;
+  /** Link by e-mail (no password). */
   signIn: (email: string) => Promise<string | null>;
+  /** Classic e-mail + password. Each returns an error message in Spanish-ready form, or null. */
+  signInPassword: (email: string, password: string) => Promise<string | null>;
+  /** Creates the account; `needsConfirm` is true when Supabase asks to confirm the e-mail first. */
+  signUp: (email: string, password: string) => Promise<{ error: string | null; needsConfirm: boolean }>;
+  resetPassword: (email: string) => Promise<string | null>;
+  /** True after opening the "reset password" link: the person must choose a new password. */
+  recovery: boolean;
+  setPassword: (password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
 }
 
@@ -19,6 +28,7 @@ export function useAuth(): AuthState {
   const [email, setEmail] = useState<string | null>(null);
   const [isEditor, setIsEditor] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [recovery, setRecovery] = useState(false);
 
   useEffect(() => {
     if (!sb) return;
@@ -43,7 +53,8 @@ export function useAuth(): AuthState {
       setReady(true);
     };
     sb.auth.getSession().then(({ data }) => apply(data.session?.user.id, data.session?.user.email));
-    const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
+    const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") setRecovery(true);
       void apply(session?.user.id, session?.user.email);
     });
     return () => sub.subscription.unsubscribe();
@@ -60,9 +71,42 @@ export function useAuth(): AuthState {
     },
     [sb],
   );
+  const signInPassword = useCallback(
+    async (mail: string, password: string) => {
+      if (!sb) return "Supabase no configurado";
+      const { error } = await sb.auth.signInWithPassword({ email: mail, password });
+      return error ? error.message : null;
+    },
+    [sb],
+  );
+  const signUp = useCallback(
+    async (mail: string, password: string) => {
+      if (!sb) return { error: "Supabase no configurado", needsConfirm: false };
+      const { data, error } = await sb.auth.signUp({ email: mail, password, options: { emailRedirectTo: window.location.origin } });
+      return { error: error ? error.message : null, needsConfirm: !error && !data.session };
+    },
+    [sb],
+  );
+  const resetPassword = useCallback(
+    async (mail: string) => {
+      if (!sb) return "Supabase no configurado";
+      const { error } = await sb.auth.resetPasswordForEmail(mail, { redirectTo: window.location.origin });
+      return error ? error.message : null;
+    },
+    [sb],
+  );
+  const setPassword = useCallback(
+    async (password: string) => {
+      if (!sb) return "Supabase no configurado";
+      const { error } = await sb.auth.updateUser({ password });
+      if (!error) setRecovery(false);
+      return error ? error.message : null;
+    },
+    [sb],
+  );
   const signOut = useCallback(async () => {
     await sb?.auth.signOut();
   }, [sb]);
 
-  return { ready, email, isEditor, isAdmin, signIn, signOut };
+  return { ready, email, isEditor, isAdmin, signIn, signInPassword, signUp, resetPassword, recovery, setPassword, signOut };
 }
