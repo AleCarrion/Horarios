@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accessError, isEmail, normalizeEmail, sortAccess, type AccessEntry } from "./accessAdmin";
+import { accessError, inviteUrl, isEmail, normalizeEmail, sortAccess, type AccessEntry } from "./accessAdmin";
 
 describe("accesos: utilidades", () => {
   it("normalises and validates e-mails", () => {
@@ -18,5 +18,12 @@ describe("accesos: utilidades", () => {
     expect(accessError("Tiene que quedar al menos una persona administradora")).toMatch(/al menos una/);
     expect(accessError('duplicate key value violates unique constraint')).toMatch(/ya está invitado/);
     expect(accessError("new row violates row-level security policy")).toMatch(/administradora puede/);
+  });
+});
+
+describe("enlace de invitación", () => {
+  it("builds the link to send, with the code safely encoded", () => {
+    expect(inviteUrl("https://horarios.vercel.app/", "abc123")).toBe("https://horarios.vercel.app/invitacion?c=abc123");
+    expect(inviteUrl("https://x.es", "a b")).toBe("https://x.es/invitacion?c=a%20b");
   });
 });

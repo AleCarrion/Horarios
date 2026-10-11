@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import { cooldownLeft, friendlyAuthError, passwordProblem } from "@/lib/loginGuard";
 import type { AuthState } from "@/lib/useAuth";
 
-type Mode = "login" | "signup" | "reset" | "link";
+export type Mode = "login" | "signup" | "reset" | "link";
 
 const input = "w-full min-w-0 rounded-xl border border-line bg-card-solid px-3 py-2.5 text-base";
 const linkBtn = "text-sm font-semibold text-brand underline-offset-2 hover:underline";
 
 /** E-mail + password form (sign in, create account, forgot password, sign-in link) and the "choose a new password" step. */
-export function LoginForm({ auth }: { auth: AuthState }) {
-  const [mode, setMode] = useState<Mode>("login");
+export function LoginForm({ auth, initialMode = "login" }: { auth: AuthState; initialMode?: Mode }) {
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [mail, setMail] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -109,7 +109,7 @@ export function LoginForm({ auth }: { auth: AuthState }) {
   const title = { login: "Entrar", signup: "Crear cuenta", reset: "Recuperar la contraseña", link: "Entrar con un enlace" }[mode];
   const hint = {
     login: "Con tu correo y tu contraseña.",
-    signup: "Solo podrás editar si la administradora te ha dado acceso con este correo.",
+    signup: "Elige tu correo y una contraseña. Después, la administradora decide qué puedes hacer.",
     reset: "Te enviaremos un correo para elegir una contraseña nueva.",
     link: "Te enviaremos un enlace al correo; al abrirlo, entras sin contraseña.",
   }[mode];
@@ -132,7 +132,7 @@ export function LoginForm({ auth }: { auth: AuthState }) {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder={mode === "signup" ? "Elige una contraseña (8 o más, con letras y números)" : "Contraseña"}
+            placeholder={mode === "signup" ? "Contraseña (8+, letras y números)" : "Contraseña"}
             className={input}
           />
         </>

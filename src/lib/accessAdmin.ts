@@ -8,6 +8,9 @@ export interface AccessEntry {
   /** "member": already signed in and active · "invited": waiting for that person to sign in. */
   status: "member" | "invited";
   userId?: string;
+  /** Invitations: id of the row and the secret code of the link. */
+  inviteId?: string;
+  code?: string;
 }
 
 export type Role = AccessEntry["role"];
@@ -33,25 +36,34 @@ export function accessError(message: string): string {
 export async function loadAccess(): Promise<{ ok: true; list: AccessEntry[] } | { ok: false; error: string }> {
   const sb = getSupabase();
   if (!sb) return { ok: false, error: "Supabase no está configurado." };
-  const [members, invites] = await Promise.all([sb.from("editors").select("user_id, email, role, staff_id"), sb.from("editor_invites").select("email, role, staff_id")]);
+  const [members, invites] = await Promise.all([sb.from("editors").select("user_id, email, role, staff_id"), sb.from("editor_invites").select("id, email, role, staff_id, code")]);
   if (members.error || invites.error) return { ok: false, error: accessError((members.error ?? invites.error)!.message) };
   const list: AccessEntry[] = [
     ...(members.data ?? []).map((m) => ({ email: m.email ?? "(sin correo)", role: m.role as Role, staffId: (m.staff_id as string | null) ?? undefined, status: "member" as const, userId: m.user_id as string })),
-    ...(invites.data ?? []).map((i) => ({ email: i.email as string, role: i.role as Role, staffId: (i.staff_id as string | null) ?? undefined, status: "invited" as const })),
+    ...(invites.data ?? []).map((i) => ({ email: (i.email as string | null) ?? "", inviteId: i.id as string, code: i.code as string, role: i.role as Role, staffId: (i.staff_id as string | null) ?? undefined, status: "invited" as const })),
   ];
   return { ok: true, list: sortAccess(list) };
 }
 
-export async function inviteEmail(email: string, role: Role, staffId?: string): Promise<string | null> {
+/** Creates an invitation (the e-mail is optional: without it, anyone with the link can use it once). Returns the code of the link. */
+export async function createInvite(opts: { email?: string; role: Role; staffId?: string }): Promise<{ error: string | null; code?: string }> {
   const sb = getSupabase();
-  const { error } = (await sb?.from("editor_invites").insert({ email: normalizeEmail(email), role, staff_id: role === "worker" ? staffId : null })) ?? { error: { message: "Supabase no configurado" } };
-  return error ? accessError(error.message) : null;
+  if (!sb) return { error: "Supabase no configurado" };
+  const { data, error } = await sb
+    .from("editor_invites")
+    .insert({ email: opts.email?.trim() ? normalizeEmail(opts.email) : null, role: opts.role, staff_id: opts.role === "worker" ? opts.staffId : null })
+    .select("code")
+    .single();
+  return error ? { error: accessError(error.message) } : { error: null, code: data.code as string };
 }
+
+/** The link to send: opens the page where the person creates her account. */
+export const inviteUrl = (origin: string, code: string) => `${origin.replace(/\/$/, "")}/invitacion?c=${encodeURIComponent(code)}`;
 
 export async function revoke(entry: AccessEntry): Promise<string | null> {
   const sb = getSupabase();
   if (!sb) return "Supabase no configurado";
-  const { error } = entry.status === "invited" ? await sb.from("editor_invites").delete().eq("email", entry.email) : await sb.from("editors").delete().eq("user_id", entry.userId!);
+  const { error } = entry.status === "invited" ? await sb.from("editor_invites").delete().eq("id", entry.inviteId!) : await sb.from("editors").delete().eq("user_id", entry.userId!);
   return error ? accessError(error.message) : null;
 }
 
@@ -59,6 +71,6 @@ export async function setRole(entry: AccessEntry, role: Role, staffId?: string):
   const sb = getSupabase();
   if (!sb) return "Supabase no configurado";
   const patch = { role, staff_id: role === "worker" ? (staffId ?? entry.staffId ?? null) : null };
-  const { error } = entry.status === "invited" ? await sb.from("editor_invites").update(patch).eq("email", entry.email) : await sb.from("editors").update(patch).eq("user_id", entry.userId!);
+  const { error } = entry.status === "invited" ? await sb.from("editor_invites").update(patch).eq("id", entry.inviteId!) : await sb.from("editors").update(patch).eq("user_id", entry.userId!);
   return error ? accessError(error.message) : null;
 }

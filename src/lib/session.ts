@@ -40,3 +40,19 @@ export const setStoredRole = (r: StoredRole | null) => {
     else localStorage.removeItem(ROLE);
   } catch {}
 };
+
+const INVITE = "horarios_invite";
+/** The code of the invitation link being used: kept until the account exists (the e-mail confirmation may take a while). */
+export const getInviteCode = (): string | null => {
+  try {
+    return localStorage.getItem(INVITE);
+  } catch {
+    return null;
+  }
+};
+export const setInviteCode = (code: string | null) => {
+  try {
+    if (code) localStorage.setItem(INVITE, code);
+    else localStorage.removeItem(INVITE);
+  } catch {}
+};

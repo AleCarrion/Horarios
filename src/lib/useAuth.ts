@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { isRecovery, setRecovery, setStoredRole } from "./session";
+import { getInviteCode, isRecovery, setInviteCode, setRecovery, setStoredRole } from "./session";
 import { getSupabase } from "./supabase";
 
 export interface AuthState {
@@ -49,6 +49,12 @@ export function useAuth(): AuthState {
         setStaffId(null);
         setStoredRole(null);
       } else {
+        // Came through an invitation link: use it first (it gives the role and, for workers, the person of the team)
+        const code = getInviteCode();
+        if (code) {
+          await sb.rpc("redeem_invite", { _code: code });
+          setInviteCode(null);
+        }
         // The server decides what this e-mail may do: invited -> editor/admin; first person ever -> admin; otherwise nothing.
         const { data: access, error } = await sb.rpc("claim_access");
         if (error) {
