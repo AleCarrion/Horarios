@@ -41,7 +41,7 @@ export function ActionSheet({ open, onClose, actions }: { open: boolean; onClose
                   a.onClick();
                 }}
                 className={`flex min-h-12 w-full items-center gap-3 rounded-2xl px-3 text-left text-base font-semibold transition active:scale-[0.99] disabled:pointer-events-none disabled:opacity-35 ${
-                  a.tone === "accent" ? "bg-gradient-to-r from-accent to-orange-500 text-white shadow-lg shadow-accent/30" : "hover:bg-brand/10"
+                  a.tone === "accent" ? "bg-gradient-to-r from-accent to-[#c2691f] text-white shadow-lg shadow-accent/30" : "hover:bg-brand/10"
                 }`}
               >
                 <span className={a.tone === "accent" ? "" : "text-brand"}>{a.icon}</span>

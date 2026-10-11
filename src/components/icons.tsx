@@ -55,15 +55,29 @@ export const PrinterIcon = (p: SVGProps<SVGSVGElement>) => (
 export const TableIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 10h18M3 15h18M9 4v16" /></svg>
 );
-export const LogoMark = (p: SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 32 32" width={32} height={32} aria-hidden="true" {...p}>
-    <rect x="5" y="7" width="22" height="20" rx="5" fill="#fff" fillOpacity=".95" />
-    <rect x="5" y="7" width="22" height="7" rx="3.5" fill="#fb923c" />
-    <rect x="9" y="17" width="4" height="3.5" rx="1" fill="#0b4f8a" /><rect x="14" y="17" width="4" height="3.5" rx="1" fill="#0b4f8a" />
-    <rect x="19" y="17" width="4" height="3.5" rx="1" fill="#0b4f8a" /><rect x="9" y="22" width="4" height="3.5" rx="1" fill="#0b4f8a" />
-    <rect x="14" y="22" width="4" height="3.5" rx="1" fill="#fb923c" />
-  </svg>
+/** The hotel's gold rosette (public/logo.png), drawn in the current text colour (white on the bronze tiles of the headers). */
+export const LogoMark = ({ width = 32, className = "", style }: { width?: number; height?: number; className?: string; style?: React.CSSProperties }) => (
+  <span
+    role="img"
+    aria-label="Hotel Casa 1800"
+    className={`inline-block text-white ${className}`}
+    style={{
+      width,
+      height: Math.round((width * 130) / 191),
+      backgroundColor: "currentColor",
+      WebkitMaskImage: "url(/logo.png)",
+      maskImage: "url(/logo.png)",
+      WebkitMaskSize: "contain",
+      maskSize: "contain",
+      WebkitMaskRepeat: "no-repeat",
+      maskRepeat: "no-repeat",
+      WebkitMaskPosition: "center",
+      maskPosition: "center",
+      ...style,
+    }}
+  />
 );
+
 export const GripIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base({ strokeWidth: 2.5, ...p })}><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" /></svg>
 );

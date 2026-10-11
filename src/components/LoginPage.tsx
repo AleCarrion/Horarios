@@ -24,8 +24,8 @@ export function LoginPage() {
     <main className="mx-auto grid min-h-dvh w-full max-w-md place-items-center p-4 pt-[calc(1rem+env(safe-area-inset-top))]">
       <div className="anim-fade-up w-full space-y-6">
         <div className="text-center">
-          <span className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-brand to-brand-2 shadow-xl shadow-brand/30">
-            <LogoMark width={38} height={38} />
+          <span className="mx-auto grid h-24 w-24 place-items-center rounded-[1.75rem] bg-white shadow-xl shadow-[#a18354]/25 ring-1 ring-[#a18354]/30">
+            <LogoMark width={84} className="!text-[#a18354]" />
           </span>
           <h1 className="mt-4 text-2xl font-bold tracking-tight">Horarios</h1>
           <p className="text-sm text-muted">Hotel Casa 1800</p>

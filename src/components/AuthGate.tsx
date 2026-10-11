@@ -10,8 +10,8 @@ import { LogoMark } from "./icons";
 export function Splash() {
   return (
     <main className="grid min-h-[70vh] place-items-center" aria-busy="true">
-      <span className="grid h-14 w-14 animate-pulse place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 shadow-lg shadow-brand/30">
-        <LogoMark width={34} height={34} />
+      <span className="grid h-16 w-16 animate-pulse place-items-center rounded-2xl bg-white shadow-lg shadow-[#a18354]/25 ring-1 ring-[#a18354]/30">
+        <LogoMark width={42} className="!text-[#a18354]" />
       </span>
     </main>
   );

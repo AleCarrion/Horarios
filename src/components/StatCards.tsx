@@ -30,7 +30,7 @@ function Ring({ pct }: { pct: number }) {
       />
       <defs>
         <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#0e7490" />
+          <stop offset="0" stopColor="#8f6e37" />
           <stop offset="1" stopColor="#22c55e" />
         </linearGradient>
       </defs>

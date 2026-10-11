@@ -1,28 +1,29 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f3f7fb;
-  --foreground: #0f1f33;
-  --brand: #0b4f8a;
-  --brand-2: #0e7490;
-  --accent: #ea580c;
+  /* Palette taken from the hotel's gold rosette (logo #a18354): deep bronze for actions, copper for the main call to action */
+  --background: #f8f5ef;
+  --foreground: #231d14;
+  --brand: #6f5528;
+  --brand-2: #8f6e37;
+  --accent: #a8480f;
   --card: rgba(255, 255, 255, 0.82);
   --card-solid: #ffffff;
-  --card-border: rgba(15, 31, 51, 0.09);
-  --muted: #5b6b7f;
+  --card-border: rgba(35, 29, 20, 0.1);
+  --muted: #6a5f50;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #08111f;
-    --foreground: #e6eef7;
-    --brand: #7cb7ee;
-    --brand-2: #5eead4;
-    --accent: #fb923c;
-    --card: rgba(17, 29, 48, 0.78);
-    --card-solid: #0e1a2d;
+    --background: #14110d;
+    --foreground: #f1ebdf;
+    --brand: #a78650;
+    --brand-2: #c9a96e;
+    --accent: #e08a45;
+    --card: rgba(32, 26, 19, 0.78);
+    --card-solid: #1d1812;
     --card-border: rgba(255, 255, 255, 0.09);
-    --muted: #9fb0c4;
+    --muted: #b3a690;
   }
 }
 

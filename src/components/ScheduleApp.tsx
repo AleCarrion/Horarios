@@ -500,7 +500,7 @@ export function ScheduleApp() {
         {/* phones: one slim bar (logo, month, more) — the rest lives in the bottom tab bar and the action sheet */}
         <div className="flex items-center gap-2 px-3 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))] sm:hidden">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-brand to-brand-2 shadow-md shadow-brand/30">
-            <LogoMark width={24} height={24} />
+            <LogoMark width={30} />
           </span>
           <div className="flex min-w-0 flex-1 items-center justify-between rounded-2xl border border-line bg-card-solid/70 p-0.5">
             <button className="grid h-10 w-10 place-items-center rounded-xl active:bg-brand/10" onClick={() => shiftMonth(-1)} aria-label="Mes anterior">
@@ -577,7 +577,7 @@ export function ScheduleApp() {
             <button
               disabled={readOnly}
               onClick={() => setConfirmRegenerate(true)}
-              className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-accent to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-accent/30 transition hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:scale-95 disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-accent to-[#c2691f] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-accent/30 transition hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:scale-95 disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
             >
               <SparklesIcon width={16} height={16} className="transition-transform group-hover:rotate-12 group-hover:scale-125" />
               Generar<span className="hidden sm:inline"> automático</span>
@@ -590,7 +590,9 @@ export function ScheduleApp() {
       <main className="mx-auto w-full min-w-0 max-w-[1500px] space-y-4 p-4">
         <StatCards coveragePct={stats.pct} covered={stats.covered} total={stats.total} issues={validation.issues.length} people={stats.people} />
 
-        <h2 className="hidden text-lg font-bold print:block">
+        <h2 className="hidden items-center gap-3 text-lg font-bold print:flex">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="" className="h-9 w-auto" />
           Horario {MONTHS[ym.month - 1]} {ym.year} · Hotel Casa 1800
         </h2>
 

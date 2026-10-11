@@ -270,7 +270,7 @@ export function TeamPage() {
         <button
           onClick={() => setAdding(true)}
           disabled={readOnly}
-          className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-accent to-orange-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-accent/30 transition hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:scale-95 disabled:pointer-events-none disabled:opacity-40 max-sm:fixed max-sm:bottom-[calc(5rem+env(safe-area-inset-bottom))] max-sm:right-4 max-sm:z-30 max-sm:shadow-2xl sm:rounded-xl sm:py-2.5"
+          className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-accent to-[#c2691f] px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-accent/30 transition hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:scale-95 disabled:pointer-events-none disabled:opacity-40 max-sm:fixed max-sm:bottom-[calc(5rem+env(safe-area-inset-bottom))] max-sm:right-4 max-sm:z-30 max-sm:shadow-2xl sm:rounded-xl sm:py-2.5"
         >
           <PlusIcon width={16} height={16} /> Añadir persona
         </button>
