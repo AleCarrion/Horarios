@@ -128,6 +128,7 @@ test("el historial recoge un cambio y permite volver atrás", async ({ page, vie
   await open(page);
   const day = await lateDay(page);
   const cell = page.locator(`[data-row][data-col="${day}"]`).nth(3);
+  await page.waitForTimeout(2000); // the month is first drawn quickly and then re-planned from last month in the background
   const before = await cell.getAttribute("aria-label");
   await cell.click();
   await page.getByRole("checkbox").uncheck();
