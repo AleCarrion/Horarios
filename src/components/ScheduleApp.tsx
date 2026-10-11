@@ -31,6 +31,7 @@ import { useRouter } from "next/navigation";
 import { ExportMenu } from "./ExportMenu";
 import { ChevronLeft, ChevronRight, CheckIcon, ClockIcon, DownloadIcon, InboxIcon, LockIcon, LogoMark, MoreIcon, PrinterIcon, TableIcon, RedoIcon, SparklesIcon, UndoIcon, UsersIcon } from "./icons";
 import { RequestsPanel } from "./RequestsPanel";
+import { MyRequestsPanel } from "./MyRequestsPanel";
 import { ActionSheet, type SheetAction } from "./ActionSheet";
 import { AppNav } from "./AppNav";
 import { MobileTabBar } from "./MobileTabBar";
@@ -478,18 +479,22 @@ export function ScheduleApp() {
   const exportICS = (person: Staff) =>
     downloadText(`${fileBase}-${person.id}.ics`, toICS(h.present, person, ym.year, ym.month), "text/calendar");
 
+  const w = auth.isWorker;
   const sheetActions: SheetAction[] = [
-    { label: "Deshacer", icon: <UndoIcon />, onClick: () => dispatch({ type: "undo" }), disabled: readOnly || !h.past.length },
-    { label: "Rehacer", icon: <RedoIcon />, onClick: () => dispatch({ type: "redo" }), disabled: readOnly || !h.future.length },
+    ...(w ? [] : [{ label: "Deshacer", icon: <UndoIcon />, onClick: () => dispatch({ type: "undo" }), disabled: readOnly || !h.past.length }]),
+    ...(w ? [] : [{ label: "Rehacer", icon: <RedoIcon />, onClick: () => dispatch({ type: "redo" }), disabled: readOnly || !h.future.length }]),
     { label: "Exportar PDF / imprimir", hint: "Una página A4 apaisada con todo el mes", icon: <PrinterIcon />, onClick: printMonth },
     { label: "Exportar CSV (Excel)", icon: <TableIcon />, onClick: exportCSV },
-    { label: "Guardar copia de seguridad", hint: "Descarga todo: equipo, meses, solicitudes y bloqueos", icon: <DownloadIcon />, onClick: saveBackup },
-    ...(remoteReadOnly ? [] : [{ label: "Restaurar copia de seguridad", icon: <DownloadIcon />, onClick: () => restoreInput.current?.click() }]),
-    ...(remote.draft ? [{ label: "Publicar mes", icon: <DownloadIcon />, onClick: () => void remote.publish() }] : []),
+    ...(w ? [] : [{ label: "Guardar copia de seguridad", hint: "Descarga todo: equipo, meses, solicitudes y bloqueos", icon: <DownloadIcon />, onClick: saveBackup }]),
+    ...(w || remoteReadOnly ? [] : [{ label: "Restaurar copia de seguridad", icon: <DownloadIcon />, onClick: () => restoreInput.current?.click() }]),
+    ...(!w && remote.draft ? [{ label: "Publicar mes", icon: <DownloadIcon />, onClick: () => void remote.publish() }] : []),
     ...(remoteConfigured ? [{ label: auth.email ? `Mi cuenta (${auth.email})` : "Entrar", icon: <UsersIcon />, onClick: () => router.push(auth.email ? "/cuenta" : "/entrar") }] : []),
-    { label: "Historial de cambios", icon: <ClockIcon />, onClick: () => setHistoryOpen(true) },
-    { label: "Generar automático", hint: "Rehace el calendario del mes", icon: <SparklesIcon />, onClick: () => setConfirmRegenerate(true), disabled: readOnly, tone: "accent" as const },
+    ...(w ? [] : [{ label: "Historial de cambios", icon: <ClockIcon />, onClick: () => setHistoryOpen(true) }]),
+    ...(w ? [] : [{ label: "Generar automático", hint: "Rehace el calendario del mes", icon: <SparklesIcon />, onClick: () => setConfirmRegenerate(true), disabled: readOnly, tone: "accent" as const }]),
   ];
+
+  // editors see every pending request; a worker only her own
+  const badge = requests.filter((r) => r.status === "pending" && (!auth.isWorker || r.staffId === auth.staffId)).length;
 
   const iconBtn =
     "glass grid h-10 w-10 place-items-center rounded-xl transition hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-95 disabled:pointer-events-none disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-brand";
@@ -551,37 +556,37 @@ export function ScheduleApp() {
           </div>
 
           <div className="order-6 ml-auto flex items-center gap-2 xl:order-4 xl:ml-0">
-            <button className={iconBtn} onClick={() => dispatch({ type: "undo" })} disabled={readOnly || !h.past.length} aria-label="Deshacer" title="Deshacer">
-              <UndoIcon />
-            </button>
-            <button className={iconBtn} onClick={() => dispatch({ type: "redo" })} disabled={readOnly || !h.future.length} aria-label="Rehacer" title="Rehacer">
-              <RedoIcon />
-            </button>
-            <button className={iconBtn} onClick={() => setHistoryOpen(true)} aria-label="Historial de cambios" title="Historial de cambios">
-              <ClockIcon />
-            </button>
+            {!auth.isWorker && (
+              <>
+                <button className={iconBtn} onClick={() => dispatch({ type: "undo" })} disabled={readOnly || !h.past.length} aria-label="Deshacer" title="Deshacer">
+                  <UndoIcon />
+                </button>
+                <button className={iconBtn} onClick={() => dispatch({ type: "redo" })} disabled={readOnly || !h.future.length} aria-label="Rehacer" title="Rehacer">
+                  <RedoIcon />
+                </button>
+                <button className={iconBtn} onClick={() => setHistoryOpen(true)} aria-label="Historial de cambios" title="Historial de cambios">
+                  <ClockIcon />
+                </button>
+              </>
+            )}
             <button
               onClick={() => setPanelOpen(true)}
-              aria-label={`Solicitudes (${requests.filter((r) => r.status === "pending").length} pendientes)`}
-              title="Solicitudes"
+              aria-label={`${auth.isWorker ? "Mis peticiones" : "Solicitudes"} (${badge} pendientes)`}
+              title={auth.isWorker ? "Mis peticiones" : "Solicitudes"}
               className={`${iconBtn} relative`}
             >
               <InboxIcon />
-              {requests.some((r) => r.status === "pending") && (
-                <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-[11px] font-bold text-white shadow">
-                  {requests.filter((r) => r.status === "pending").length}
-                </span>
-              )}
+              {badge > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-[11px] font-bold text-white shadow">{badge}</span>}
             </button>
             <ExportMenu onPdf={printMonth} onCsv={exportCSV} onBackup={saveBackup} onRestore={remoteReadOnly ? undefined : () => restoreInput.current?.click()} />
-            <button
+            {!auth.isWorker && <button
               disabled={readOnly}
               onClick={() => setConfirmRegenerate(true)}
               className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-accent to-[#c2691f] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-accent/30 transition hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:scale-95 disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
             >
               <SparklesIcon width={16} height={16} className="transition-transform group-hover:rotate-12 group-hover:scale-125" />
               Generar<span className="hidden sm:inline"> automático</span>
-            </button>
+            </button>}
           </div>
         </div>
       </header>
@@ -701,6 +706,7 @@ export function ScheduleApp() {
             onSwap={readOnly ? undefined : requestSwap}
             preview={previewCells}
             holidays={localHolidaysOf(rules, ym.year)}
+            mineId={auth.isWorker ? auth.staffId : null}
           />
           </div>
         )}
@@ -748,7 +754,7 @@ export function ScheduleApp() {
         <MonthSummary schedule={shown} staff={visible} year={ym.year} month={ym.month} holidays={localHolidaysOf(rules, ym.year)} />
 
       </main>
-      <MobileTabBar pending={requests.filter((r) => r.status === "pending").length} onRequests={() => setPanelOpen(true)} />
+      <MobileTabBar pending={badge} onRequests={() => setPanelOpen(true)} />
       <LinkData auth={auth} />
       <HistoryPanel
         open={historyOpen}
@@ -767,8 +773,20 @@ export function ScheduleApp() {
         }}
       />
       <ActionSheet open={sheetOpen} onClose={() => setSheetOpen(false)} actions={sheetActions} />
+      {auth.isWorker && (
+        <MyRequestsPanel
+          open={panelOpen}
+          onClose={() => setPanelOpen(false)}
+          me={staff.find((s) => s.id === auth.staffId)}
+          staff={staff}
+          requests={requests}
+          today={today}
+          onCreate={(rs) => saveRequests([...requests, ...rs])}
+          onCancel={(id) => saveRequests(requests.filter((r) => r.id !== id))}
+        />
+      )}
       <RequestsPanel
-        open={panelOpen}
+        open={panelOpen && !auth.isWorker}
         onClose={() => setPanelOpen(false)}
         requests={requests}
         staff={staff}

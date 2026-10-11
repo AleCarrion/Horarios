@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { isRecovery, setRecovery } from "./session";
+import { isRecovery, setRecovery, setStoredRole } from "./session";
 import { getSupabase } from "./supabase";
 
 export interface AuthState {
@@ -10,6 +10,10 @@ export interface AuthState {
   isEditor: boolean;
   /** Can invite and remove other editors (see /acceso). */
   isAdmin: boolean;
+  /** Sees the schedule and sends her own requests, but changes nothing. */
+  isWorker: boolean;
+  /** Workers: the person of the team they are. */
+  staffId: string | null;
   /** Link by e-mail (no password). */
   signIn: (email: string) => Promise<string | null>;
   /** Classic e-mail + password. Each returns an error message in Spanish-ready form, or null. */
@@ -29,6 +33,8 @@ export function useAuth(): AuthState {
   const [email, setEmail] = useState<string | null>(null);
   const [isEditor, setIsEditor] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isWorker, setIsWorker] = useState(false);
+  const [staffId, setStaffId] = useState<string | null>(null);
   const [recovery, setRecoveryState] = useState(false);
 
   useEffect(() => {
@@ -39,6 +45,9 @@ export function useAuth(): AuthState {
       if (!userId) {
         setIsEditor(false);
         setIsAdmin(false);
+        setIsWorker(false);
+        setStaffId(null);
+        setStoredRole(null);
       } else {
         // The server decides what this e-mail may do: invited -> editor/admin; first person ever -> admin; otherwise nothing.
         const { data: access, error } = await sb.rpc("claim_access");
@@ -47,9 +56,17 @@ export function useAuth(): AuthState {
           const { data } = await sb.from("editors").select("user_id").eq("user_id", userId).maybeSingle();
           setIsEditor(Boolean(data));
           setIsAdmin(false);
+          setIsWorker(false);
+          setStoredRole(data ? "editor" : null);
         } else {
           setIsEditor(access === "admin" || access === "editor");
           setIsAdmin(access === "admin");
+          setIsWorker(access === "worker");
+          setStoredRole(access === "admin" || access === "editor" || access === "worker" ? access : null);
+          if (access === "worker") {
+            const { data: me } = await sb.from("editors").select("staff_id").eq("user_id", userId).maybeSingle();
+            setStaffId((me?.staff_id as string | null) ?? null);
+          } else setStaffId(null);
         }
       }
       setReady(true);
@@ -116,5 +133,5 @@ export function useAuth(): AuthState {
     await sb?.auth.signOut();
   }, [sb]);
 
-  return { ready, email, isEditor, isAdmin, signIn, signInPassword, signUp, resetPassword, recovery, setPassword, signOut };
+  return { ready, email, isEditor, isAdmin, isWorker, staffId, signIn, signInPassword, signUp, resetPassword, recovery, setPassword, signOut };
 }

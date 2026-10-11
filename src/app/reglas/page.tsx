@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Reglas · Casa 1800" };
 
 export default function Page() {
   return (
-    <AuthGate>
+    <AuthGate editorsOnly>
       <RulesPage />
     </AuthGate>
   );

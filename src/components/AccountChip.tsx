@@ -12,7 +12,7 @@ export function AccountChip({ auth, status }: { auth: AuthState; status?: SyncSt
         Entrar
       </Link>
     );
-  const role = auth.isAdmin ? "administradora" : auth.isEditor ? "editora" : "solo lectura";
+  const role = auth.isAdmin ? "administradora" : auth.isEditor ? "editora" : auth.isWorker ? "trabajador" : "solo lectura";
   return (
     <Link
       href="/cuenta"

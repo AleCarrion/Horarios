@@ -5,14 +5,17 @@ import { useCallback, useEffect, useState } from "react";
 import { inviteEmail, isEmail, loadAccess, revoke, setRole, type AccessEntry, type Role } from "@/lib/accessAdmin";
 import { remoteConfigured } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
+import { useTeam } from "@/lib/useTeam";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { LogoMark, PlusIcon, TrashIcon } from "./icons";
 
-const ROLE_LABEL: Record<Role, string> = { admin: "Administradora", editor: "Editora" };
+const ROLE_LABEL: Record<Role, string> = { admin: "Administradora", editor: "Editora", worker: "Trabajador" };
 
 /** The admin decides who may edit: invites an e-mail, and that person becomes an editor the first time she signs in. */
 export function AccessPage() {
   const auth = useAuth();
+  const team = useTeam(auth);
+  const [staffId, setStaffId] = useState("");
   const [list, setList] = useState<AccessEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mail, setMail] = useState("");
@@ -42,7 +45,11 @@ export function AccessPage() {
   const add = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isEmail(mail)) return setError("Escribe un correo válido.");
-    if (await run(() => inviteEmail(mail, role))) setMail("");
+    if (role === "worker" && !staffId) return setError("Elige a qué persona del equipo corresponde este trabajador.");
+    if (await run(() => inviteEmail(mail, role, staffId))) {
+      setMail("");
+      setStaffId("");
+    }
   };
 
   return (
@@ -64,7 +71,7 @@ export function AccessPage() {
         <div className="anim-fade-up">
           <h2 className="text-xl font-bold tracking-tight sm:text-2xl">Accesos</h2>
           <p className="mt-1 max-w-xl text-sm text-muted">
-            Quién puede modificar el horario. Escribe su correo: cuando entre en la app con él, ya podrá editar. Cualquier otra persona solo ve el horario.
+            Quién puede hacer qué. Escribe el correo y elige el permiso: editora (cambia el horario), administradora (además da accesos) o trabajador (ve el horario y envía sus propias peticiones). Cuando esa persona entre con ese correo, tendrá ese permiso.
           </p>
         </div>
 
@@ -90,8 +97,20 @@ export function AccessPage() {
                   <select value={role} onChange={(e) => setNewRole(e.target.value as Role)} className="mt-0.5 block rounded-xl border border-line bg-card-solid px-3 py-2">
                     <option value="editor">Editar el horario</option>
                     <option value="admin">Editar y dar accesos</option>
+                    <option value="worker">Solo ver y enviar peticiones (trabajador)</option>
                   </select>
                 </label>
+                {role === "worker" && (
+                  <label className="basis-full sm:basis-auto">
+                    <span className="text-xs text-muted">¿Quién es?</span>
+                    <select required value={staffId} onChange={(e) => setStaffId(e.target.value)} className="mt-0.5 block w-full rounded-xl border border-line bg-card-solid px-3 py-2">
+                      <option value="">elegir persona…</option>
+                      {team.staff.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <button disabled={busy} className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 px-4 font-semibold text-white shadow transition active:scale-95 disabled:opacity-50">
                   <PlusIcon width={16} height={16} /> Invitar
                 </button>
@@ -106,14 +125,21 @@ export function AccessPage() {
                 <li key={`${a.status}|${a.email}`} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-card-solid/70 px-4 py-3">
                   <span className="min-w-0">
                     <span className="block truncate font-semibold">{a.email}{a.email === auth.email ? " (tú)" : ""}</span>
-                    <span className="text-xs text-muted">{a.status === "invited" ? "Invitada · todavía no ha entrado" : "Con acceso"}</span>
+                    <span className="text-xs text-muted">
+                      {a.status === "invited" ? "Invitada · todavía no ha entrado" : "Con acceso"}
+                      {a.role === "worker" && a.staffId ? ` · es ${team.staff.find((s) => s.id === a.staffId)?.name ?? a.staffId}` : ""}
+                    </span>
                   </span>
                   <span className="flex items-center gap-2">
                     <select
                       aria-label={`Permiso de ${a.email}`}
                       value={a.role}
                       disabled={busy}
-                      onChange={(e) => void run(() => setRole(a, e.target.value as Role))}
+                      onChange={(e) => {
+                        const next = e.target.value as Role;
+                        if (next === "worker" && !a.staffId) return setError("Para pasarla a trabajador, quita el acceso y vuelve a invitarla eligiendo a qué persona del equipo corresponde.");
+                        void run(() => setRole(a, next));
+                      }}
                       className="rounded-lg border border-line bg-card-solid px-2 py-1.5 text-sm"
                     >
                       {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (

@@ -10,7 +10,7 @@ estado de cada mes se comparten entre tus dispositivos (móvil y ordenador) y qu
 
 1. En <https://supabase.com> crea una cuenta y un proyecto nuevo (región: la UE más cercana, p. ej. *West EU (Ireland)*). Guarda la contraseña de la base de datos en tu gestor de contraseñas.
 2. **SQL editor → New query**, pega **todo** el contenido de `supabase/setup_all.sql` y pulsa *Run*. Debe terminar sin errores.
-   (Es la suma de las migraciones 0001–0007 y los datos iniciales. Si cambias una migración, regenera con `npm run db:bundle`.)
+   (Es la suma de las migraciones 0001–0008 y los datos iniciales. Si cambias una migración, regenera con `npm run db:bundle`.)
 3. **Authentication → URL configuration**: en *Site URL* pon la dirección de la app en Vercel y añade como *Redirect URL* esa misma dirección y `http://localhost:3000`.
 4. **Authentication → Sign In / Providers → Email**: déjalo activado (acceso con correo y contraseña). Para que crear cuenta sea inmediato, desactiva **Confirm email** (así no hace falta confirmar por correo; las personas invitadas ya las controlas tú desde *Accesos*). Si lo dejas activado, al crear la cuenta llega un correo con un enlace de confirmación. La opción de «entrar con enlace» y «he olvidado la contraseña» funcionan en ambos casos.
 5. **No desactives** *Allow new users to sign up*: las personas que invites necesitan poder entrar por primera vez. Quien entre sin estar invitado puede ver el horario (como cualquiera), pero no editar nada.
@@ -21,6 +21,18 @@ estado de cada mes se comparten entre tus dispositivos (móvil y ordenador) y qu
 (Proyectos creados antes de la migración 0007: ejecuta `supabase/migrations/0007_admin_access.sql` en el SQL editor. Si ya tenías a alguien en `editors`, esa persona sigue pudiendo editar; para administrar accesos, la primera en entrar tras la migración sin ser editora no obtiene nada, así que en ese caso usa `supabase/add_editor.sql` con `role = 'admin'`.)
 
 **Pantallas de acceso:** con Supabase conectado, la app abre en una pantalla de **Entrar** (correo y contraseña). Quien solo quiera mirar puede pulsar «Solo quiero ver el horario». Arriba a la derecha hay un círculo con tu inicial: lleva a **Mi cuenta** (quién eres, permisos, estado de sincronización, cambiar contraseña, cerrar sesión y, si eres administradora, **Gestionar accesos**). En el móvil está en el menú «⋯». Sin Supabase (modo local) no hay pantalla de entrada.
+
+## Trabajadores (solo ver y enviar peticiones)
+
+Desde **Accesos** puedes invitar a un correo con el permiso **Solo ver y enviar peticiones (trabajador)** y elegir **qué persona del equipo es**. Cuando entre con ese correo:
+
+- ve el horario completo (con su fila marcada como «tú») pero no puede cambiar nada;
+- tiene un botón **Mis peticiones** para pedir un libre, vacaciones, un turno concreto (mañanas, tardes…) o un cambio de turno con un compañero, ver si están pendientes, aprobadas o rechazadas (con la nota de la jefa) y cancelar las pendientes;
+- no ve las peticiones de nadie más, ni las pantallas de Equipo, Reglas y Accesos.
+
+La jefa las recibe en su bandeja de **Solicitudes** y las aprueba o rechaza como siempre. La base de datos lo garantiza (hay pruebas automáticas): un trabajador solo puede crear peticiones suyas y pendientes, no puede aprobarse nada ni tocar el horario.
+Hasta que la jefa **publique el mes**, los trabajadores ven «Este mes todavía no está publicado».
+Si ya tenías el proyecto montado, ejecuta `supabase/migrations/0008_workers.sql` en el SQL editor.
 
 ## 2. Conectar la app
 

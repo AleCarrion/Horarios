@@ -21,7 +21,7 @@ export function Splash() {
  * With Supabase connected, the app opens on the sign-in page. A person can still choose "just look at the schedule"
  * (read-only, kept for this tab only). Without Supabase (local mode) there is nothing to sign in to.
  */
-export function AuthGate({ children }: { children: ReactNode }) {
+export function AuthGate({ children, editorsOnly = false }: { children: ReactNode; /** Workers are sent back to the schedule (Equipo, Reglas, Accesos are not for them). */ editorsOnly?: boolean }) {
   const auth = useAuth();
   const router = useRouter();
   const [guest, setGuest] = useState<boolean | null>(null);
@@ -29,12 +29,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
     setGuest(isGuest()); // eslint-disable-line react-hooks/set-state-in-effect
   }, []);
 
+  const away = editorsOnly && remoteConfigured && auth.ready && auth.isWorker;
+  useEffect(() => {
+    if (away) router.replace("/");
+  }, [away, router]);
+
   const toLogin = remoteConfigured && auth.ready && guest !== null && ((!auth.email && !guest) || auth.recovery);
   useEffect(() => {
     if (toLogin) router.replace("/entrar");
   }, [toLogin, router]);
 
   if (!remoteConfigured) return <>{children}</>;
-  if (!auth.ready || guest === null || toLogin) return <Splash />;
+  if (!auth.ready || guest === null || toLogin || away) return <Splash />;
   return <>{children}</>;
 }

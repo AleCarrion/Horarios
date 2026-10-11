@@ -27,8 +27,14 @@ export function AccountPage() {
     setQueued(readQueue().length);
   }, []);
 
-  const role = auth.isAdmin ? "Administradora" : auth.isEditor ? "Editora" : "Solo lectura";
-  const what = auth.isAdmin ? "Puede editar el horario y dar acceso a otras personas." : auth.isEditor ? "Puede editar el horario." : "Puede ver el horario, pero no modificarlo.";
+  const role = auth.isAdmin ? "Administradora" : auth.isEditor ? "Editora" : auth.isWorker ? "Trabajador" : "Solo lectura";
+  const what = auth.isAdmin
+    ? "Puede editar el horario y dar acceso a otras personas."
+    : auth.isEditor
+      ? "Puede editar el horario."
+      : auth.isWorker
+        ? "Ve el horario y envía sus propias peticiones (libres, vacaciones, turnos y cambios)."
+        : "Puede ver el horario, pero no modificarlo.";
   const status: SyncStatus = !remoteConfigured ? "local" : !auth.isEditor ? "readonly" : queued > 0 ? "pending" : "synced";
 
   const change = async (e: React.FormEvent) => {

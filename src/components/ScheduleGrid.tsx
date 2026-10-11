@@ -57,6 +57,8 @@ interface Props {
   preview?: Set<string>;
   readOnly?: boolean;
   today?: string | null;
+  /** The row of the signed-in worker: marked "Tú". */
+  mineId?: string | null;
   /** Local holidays on top of the national ones. */
   holidays?: string[];
   /** Show only these days (a week on phones); `undefined` = the whole month. */
@@ -65,7 +67,7 @@ interface Props {
   compact?: boolean;
 }
 
-export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, onCalendar, onMove, onPlan, onSwap, locked, onLock, preview, readOnly, today, dates: only, compact, holidays }: Props) {
+export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit, onCalendar, onMove, onPlan, onSwap, locked, onLock, preview, readOnly, today, dates: only, compact, holidays, mineId }: Props) {
   const dates = monthDates(year, month);
   const cols = only ?? dates;
   const [menu, setMenu] = useState<{ staff: Staff; date: string; x: number; y: number } | null>(null);
@@ -285,7 +287,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                   onDragOver={(e) => dropOnRow(e, s, false)}
                   onDragLeave={clearDrop}
                   onDrop={(e) => dropOnRow(e, s, true)}
-                  className="sticky left-0 z-10 rounded-xl bg-card-solid p-1.5 pr-2 text-left font-medium transition-colors"
+                  className={`sticky left-0 z-10 rounded-xl p-1.5 pr-2 text-left font-medium transition-colors ${s.id === mineId ? "bg-brand/15 ring-1 ring-brand/40" : "bg-card-solid"}`}
                 >
                   <div className="flex items-center gap-2">
                     {onMove && !compact && (
@@ -302,7 +304,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                       {initials(s.name)}
                     </span>
                     <span className="min-w-0 flex-1 leading-tight">
-                      <span className="block truncate text-[13px] font-semibold">{s.name}</span>
+                      <span className="block truncate text-[13px] font-semibold">{s.name}{s.id === mineId && <span className="ml-1.5 rounded-full bg-accent/20 px-1.5 py-px text-[10px] font-bold text-accent">tú</span>}</span>
                       <span className="hidden truncate text-[11px] text-muted sm:block">{ROLE_LABEL[s.role]}</span>
                     </span>
                     {onCalendar && !compact && (

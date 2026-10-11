@@ -11,8 +11,10 @@ describe("accesos: utilidades", () => {
   it("lists members before invitations, admins first", () => {
     const e = (email: string, role: AccessEntry["role"], status: AccessEntry["status"]): AccessEntry => ({ email, role, status });
     expect(sortAccess([e("z@x.es", "editor", "invited"), e("b@x.es", "editor", "member"), e("a@x.es", "admin", "member"), e("c@x.es", "admin", "invited")]).map((x) => x.email)).toEqual(["a@x.es", "b@x.es", "c@x.es", "z@x.es"]);
+    expect(sortAccess([e("w@x.es", "worker", "member"), e("e@x.es", "editor", "member")]).map((x) => x.email)).toEqual(["e@x.es", "w@x.es"]);
   });
   it("explains database errors in Spanish", () => {
+    expect(accessError('violates check constraint "invites_worker_has_staff"')).toMatch(/vinculado/);
     expect(accessError("Tiene que quedar al menos una persona administradora")).toMatch(/al menos una/);
     expect(accessError('duplicate key value violates unique constraint')).toMatch(/ya está invitado/);
     expect(accessError("new row violates row-level security policy")).toMatch(/administradora puede/);
