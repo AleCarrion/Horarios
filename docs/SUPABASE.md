@@ -21,6 +21,7 @@ estado de cada mes se comparten entre tus dispositivos (móvil y ordenador) y qu
 
 - En local: copia `.env.example` a `.env.local` y rellena `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 - En Vercel: *Project → Settings → Environment Variables*, las mismas dos variables (en *Production* y *Preview*), y vuelve a desplegar.
+- Si Vercel no te deja crear una variable cuyo nombre contiene «KEY», usa `NEXT_PUBLIC_SUPABASE_ANON` (sin «_KEY»): la app acepta las dos. Si el aviso es por «Sensitive», desmarca esa casilla: esta clave es pública.
 - La clave *anon* es pública por diseño; **nunca** pongas la clave `service_role` en la app ni en Vercel.
 
 ## 3. Primera conexión: qué pasa con lo que ya tienes en el dispositivo
