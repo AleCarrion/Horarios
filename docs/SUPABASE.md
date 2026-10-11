@@ -38,11 +38,11 @@ La jefa las recibe en su bandeja de **Solicitudes** y las aprueba o rechaza como
 Hasta que la jefa **publique el mes**, los trabajadores ven «Este mes todavía no está publicado».
 Si ya tenías el proyecto montado, ejecuta `supabase/migrations/0008_workers.sql` en el SQL editor.
 
-## Entrar con Google o Apple
+## Entrar con Google
 
-La app ya trae los botones **Continuar con Google / Apple** en la pantalla de entrada y en la de invitación; se muestran solo para los proveedores que actives con la variable `NEXT_PUBLIC_OAUTH_PROVIDERS` (por ejemplo `google` o `google,apple`). Los permisos no cambian: quien entra con Google o Apple se trata igual que con correo y contraseña (la administradora lo invita por correo o enlace; si entra con el mismo correo que usó en la invitación, queda vinculado).
+La app trae el botón **Continuar con Google** en la pantalla de entrada y en la de invitación; se muestra solo si activas la variable `NEXT_PUBLIC_OAUTH_PROVIDERS` con el valor `google`. Los permisos no cambian: quien entra con Google se trata igual que con correo y contraseña (la administradora lo invita por correo o enlace; si entra con el mismo correo que usó en la invitación, queda vinculado).
 
-La dirección de retorno de Supabase para ambos es: `https://TU-PROYECTO.supabase.co/auth/v1/callback` (la tuya: `https://gacmwgfuwkxlxtdbsisz.supabase.co/auth/v1/callback`).
+La dirección de retorno de Supabase es: `https://TU-PROYECTO.supabase.co/auth/v1/callback` (la tuya: `https://gacmwgfuwkxlxtdbsisz.supabase.co/auth/v1/callback`).
 
 ### Google (gratis, ~10 minutos)
 1. Entra en <https://console.cloud.google.com> con una cuenta de Google y crea un proyecto (por ejemplo «Horarios Casa 1800»).
@@ -50,14 +50,6 @@ La dirección de retorno de Supabase para ambos es: `https://TU-PROYECTO.supabas
 3. **Credenciales → Crear credenciales → ID de cliente de OAuth → Aplicación web**. En *URI de redirección autorizados* pega la dirección de retorno de Supabase de arriba. Crea y copia el **ID de cliente** y el **Secreto**.
 4. En Supabase: **Authentication → Sign In / Providers → Google** → activa, pega ID de cliente y Secreto, guarda.
 5. En Vercel añade `NEXT_PUBLIC_OAUTH_PROVIDERS` = `google` y vuelve a desplegar.
-
-### Apple (requiere cuenta de Apple Developer, 99 €/año)
-1. En <https://developer.apple.com> → **Certificates, Identifiers & Profiles**: crea un **App ID** con «Sign in with Apple», y un **Services ID** (será el *Client ID*; actívale «Sign in with Apple» y, en *Configure*, pon como dominio `gacmwgfuwkxlxtdbsisz.supabase.co` y como *Return URL* la dirección de retorno de Supabase).
-2. Crea una **Key** con «Sign in with Apple» y descarga el archivo `.p8` (solo se descarga una vez); apunta el *Key ID* y tu *Team ID*.
-3. Supabase necesita un *secret* generado a partir de esa clave (un JWT que **caduca cada 6 meses como máximo**: hay que renovarlo). Supabase explica cómo generarlo en su guía de Apple; pégalo en **Authentication → Providers → Apple** junto al Services ID.
-4. En Vercel: `NEXT_PUBLIC_OAUTH_PROVIDERS` = `google,apple` y vuelve a desplegar.
-
-Apple es opcional y tiene coste y mantenimiento; con **Google + correo/contraseña** la mayoría de la gente ya está cubierta (en iPhone, Google también funciona).
 
 ## 2. Conectar la app
 
