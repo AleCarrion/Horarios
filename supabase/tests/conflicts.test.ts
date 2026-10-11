@@ -13,25 +13,25 @@ beforeAll(async () => {
 });
 
 const apply = (cells: object[], who = manager) => as(db, who, async () => (await db.query<{ r: unknown }>("select public.apply_cells($1::jsonb) as r", [JSON.stringify(cells)])).rows[0].r as { staff_id: string; day: string; shift_code: string }[]);
-const cell = (id: string, day: string, _unused?: string) => db.query<{ shift_code: string }>("select shift_code from public.monthly_schedule where staff_id = $1 and day = $2", [id, day]).then((r) => r.rows[0]?.shift_code);
+const cell = (id: string, day: string) => db.query<{ shift_code: string }>("select shift_code from public.monthly_schedule where staff_id = $1 and day = $2", [id, day]).then((r) => r.rows[0]?.shift_code);
 const longAgo = "2000-01-01T00:00:00Z";
 const future = "2999-01-01T00:00:00Z";
 
 describe("guardar casillas sin pisar cambios más nuevos", () => {
   it("una casilla nueva se guarda", async () => {
     expect(await apply([{ staff_id: "ana", day: "2026-11-01", shift_code: "P", at: future }])).toEqual([]);
-    expect(await cell("ana", "2026-11-01", "")).toBe("P");
+    expect(await cell("ana", "2026-11-01")).toBe("P");
   });
 
   it("editada después de lo que hay en el servidor: gana la edición", async () => {
     expect(await apply([{ staff_id: "ana", day: "2026-11-01", shift_code: "D", at: future }])).toEqual([]);
-    expect(await cell("ana", "2026-11-01", "")).toBe("D");
+    expect(await cell("ana", "2026-11-01")).toBe("D");
   });
 
   it("editada ANTES de lo que hay en el servidor (otro dispositivo cambió después): gana el servidor y se avisa", async () => {
     const rejected = await apply([{ staff_id: "ana", day: "2026-11-01", shift_code: "M", at: longAgo }]);
     expect(rejected).toEqual([{ staff_id: "ana", day: "2026-11-01", shift_code: "D" }]);
-    expect(await cell("ana", "2026-11-01", "")).toBe("D");
+    expect(await cell("ana", "2026-11-01")).toBe("D");
   });
 
   it("si el valor ya es el mismo no hay conflicto", async () => {
@@ -44,7 +44,7 @@ describe("guardar casillas sin pisar cambios más nuevos", () => {
       { staff_id: "julio", day: "2026-11-02", shift_code: "P", at: future },
     ]);
     expect(rejected.map((r) => r.staff_id)).toEqual(["ana"]);
-    expect(await cell("julio", "2026-11-02", "")).toBe("P");
+    expect(await cell("julio", "2026-11-02")).toBe("P");
   });
 
   it("solo la editora puede usarlo", async () => {
@@ -55,7 +55,7 @@ describe("guardar casillas sin pisar cambios más nuevos", () => {
       failed = true;
     }
     expect(failed).toBe(true);
-    expect(await cell("ana", "2026-11-05", "")).toBeUndefined();
+    expect(await cell("ana", "2026-11-05")).toBeUndefined();
   });
 });
 

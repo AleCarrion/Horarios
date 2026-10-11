@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { cooldownLeft, friendlyAuthError } from "@/lib/loginGuard";
 import type { AuthState } from "@/lib/useAuth";
@@ -34,7 +35,8 @@ export function AuthBar({ auth, status }: { auth: AuthState; status: SyncStatus 
       {status !== "local" &&
         (auth.email ? (
           <>
-            <span>{auth.email}{auth.isEditor ? " · editora" : ""}</span>
+            <span>{auth.email}{auth.isAdmin ? " · administradora" : auth.isEditor ? " · editora" : ""}</span>
+            {auth.isAdmin && <Link href="/acceso" className="font-semibold text-brand underline-offset-2 hover:underline">Accesos</Link>}
             <button className="underline" onClick={() => void auth.signOut()}>Salir</button>
           </>
         ) : (

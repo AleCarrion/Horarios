@@ -10,12 +10,15 @@ estado de cada mes se comparten entre tus dispositivos (móvil y ordenador) y qu
 
 1. En <https://supabase.com> crea una cuenta y un proyecto nuevo (región: la UE más cercana, p. ej. *West EU (Ireland)*). Guarda la contraseña de la base de datos en tu gestor de contraseñas.
 2. **SQL editor → New query**, pega **todo** el contenido de `supabase/setup_all.sql` y pulsa *Run*. Debe terminar sin errores.
-   (Es la suma de las migraciones 0001–0006 y los datos iniciales. Si cambias una migración, regenera con `npm run db:bundle`.)
+   (Es la suma de las migraciones 0001–0007 y los datos iniciales. Si cambias una migración, regenera con `npm run db:bundle`.)
 3. **Authentication → URL configuration**: en *Site URL* pon la dirección de la app en Vercel y añade como *Redirect URL* esa misma dirección y `http://localhost:3000`.
 4. **Authentication → Providers → Email**: deja activado el enlace mágico (*Magic link*). Desactiva «Confirm email» si te lo pide; no se usan contraseñas.
-5. **Authentication → Sign In / Providers**: desactiva *Allow new users to sign up* una vez que hayas entrado tú (paso 7). Así nadie más puede crearse una cuenta. (La jefa ya existe y entra con su enlace.)
+5. **No desactives** *Allow new users to sign up*: las personas que invites necesitan poder entrar por primera vez. Quien entre sin estar invitado puede ver el horario (como cualquiera), pero no editar nada.
 6. **Project settings → API**: copia la *Project URL* y la clave *anon public*.
-7. Entra en la app con el correo de la jefa (te llega un enlace). Después, en el SQL editor, ejecuta `supabase/add_editor.sql` cambiando el correo. Debe devolver una fila.
+7. **Entra tú primero** en la app con tu correo (te llega un enlace). La primera persona que entra tras montar la base de datos se queda como **administradora**, así que hazlo enseguida, antes de dar la dirección a nadie.
+8. Desde la app, pulsa **Accesos** (junto a tu correo, arriba) y escribe el correo de la jefa y de quien deba editar. Cuando entren con ese correo, podrán editar. No hace falta tocar SQL nunca más.
+
+(Proyectos creados antes de la migración 0007: ejecuta `supabase/migrations/0007_admin_access.sql` en el SQL editor. Si ya tenías a alguien en `editors`, esa persona sigue pudiendo editar; para administrar accesos, la primera en entrar tras la migración sin ser editora no obtiene nada, así que en ese caso usa `supabase/add_editor.sql` con `role = 'admin'`.)
 
 ## 2. Conectar la app
 
@@ -67,7 +70,7 @@ En *Authentication → Rate limits* puedes bajar el límite de correos por hora.
 
 | Síntoma | Causa probable | Solución |
 |---|---|---|
-| «Solo lectura» al entrar la jefa | Su usuario no está en `editors` | Ejecuta `supabase/add_editor.sql` con su correo |
+| «Solo lectura» al entrar la jefa | Su correo no está invitado | Que la administradora lo añada en **Accesos** |
 | No llega el enlace | Correo mal escrito o límite de envíos | Espera unos minutos; revisa *Authentication → Logs* |
 | El enlace lleva a una página que no es la app | *Site URL / Redirect URL* mal puestas | Paso 1.3 |
 | Cambios «pendientes de enviar» que no se envían | Sin internet o sin permiso | Se reintenta cada 30 s; si es permiso, comprueba `editors` |

@@ -19,10 +19,10 @@ npm test           # generador, validación, exportación, sincronización
 
 Guía completa en [`docs/SUPABASE.md`](docs/SUPABASE.md). En resumen:
 
-1. Crea un proyecto y pega `supabase/setup_all.sql` en el SQL editor (migraciones 0001–0006 + datos iniciales; se regenera con `npm run db:bundle`).
+1. Crea un proyecto y pega `supabase/setup_all.sql` en el SQL editor (migraciones 0001–0007 + datos iniciales; se regenera con `npm run db:bundle`).
 2. En *Authentication → URL configuration* añade la URL de la app (y `http://localhost:3000`) como redirect.
 3. Copia `.env.example` a `.env.local` y rellena la URL y la clave *anon*.
-4. Entra una vez con el correo de la jefa y ejecuta `supabase/add_editor.sql` con su correo.
+4. Entra tú primero con tu correo (serás la administradora) y, desde **Accesos** en la propia app, invita el correo de la jefa y de quien deba editar.
 5. En la primera conexión, la app pregunta qué hacer con los datos del dispositivo (subirlos o descartarlos).
 
 En Vercel define las mismas dos variables en *Project Settings → Environment Variables*.
