@@ -518,7 +518,7 @@ export function ScheduleApp() {
           </button>
         </div>
         <div className="mx-auto w-full max-w-[1500px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 max-sm:hidden sm:flex">
-          <div className="flex items-center gap-3">
+          <div className="order-1 flex items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 shadow-lg shadow-brand/30">
               <LogoMark />
             </span>
@@ -528,9 +528,17 @@ export function ScheduleApp() {
             </div>
           </div>
 
-          <AppNav />
+          <div className="order-2"><AppNav /></div>
 
-          <div className="order-last mx-auto flex w-full items-center justify-between gap-1 rounded-2xl border border-line bg-card-solid/70 p-1 sm:order-none sm:w-auto">
+          {remoteConfigured && (
+            <div className="order-3 ml-auto xl:order-5 xl:ml-0">
+              <AccountChip auth={auth} status={(team.pending || requestsRemote.pending || locksRemote.pending) && remote.status === "synced" ? "pending" : remote.status} />
+            </div>
+          )}
+
+          <div className="order-4 h-0 basis-full xl:hidden" aria-hidden="true" />
+
+          <div className="order-5 flex items-center justify-between gap-1 rounded-2xl border border-line bg-card-solid/70 p-1 xl:order-3 xl:mx-auto">
             <button className={`${iconBtn} !h-9 !w-9 border-0 shadow-none`} onClick={() => shiftMonth(-1)} aria-label="Mes anterior">
               <ChevronLeft />
             </button>
@@ -542,7 +550,7 @@ export function ScheduleApp() {
             </button>
           </div>
 
-          <div className="ml-auto flex items-center gap-2 sm:ml-0">
+          <div className="order-6 ml-auto flex items-center gap-2 xl:order-4 xl:ml-0">
             <button className={iconBtn} onClick={() => dispatch({ type: "undo" })} disabled={readOnly || !h.past.length} aria-label="Deshacer" title="Deshacer">
               <UndoIcon />
             </button>
@@ -566,14 +574,6 @@ export function ScheduleApp() {
               )}
             </button>
             <ExportMenu onPdf={printMonth} onCsv={exportCSV} onBackup={saveBackup} onRestore={remoteReadOnly ? undefined : () => restoreInput.current?.click()} />
-            {remote.draft && (
-              <button
-                className="rounded-xl border border-brand/40 bg-brand/10 px-3.5 py-2 text-sm font-semibold text-brand transition hover:-translate-y-0.5 hover:bg-brand/20"
-                onClick={() => void remote.publish()}
-              >
-                Publicar mes
-              </button>
-            )}
             <button
               disabled={readOnly}
               onClick={() => setConfirmRegenerate(true)}
@@ -582,7 +582,6 @@ export function ScheduleApp() {
               <SparklesIcon width={16} height={16} className="transition-transform group-hover:rotate-12 group-hover:scale-125" />
               Generar<span className="hidden sm:inline"> automático</span>
             </button>
-            {remoteConfigured && <AccountChip auth={auth} status={(team.pending || requestsRemote.pending || locksRemote.pending) && remote.status === "synced" ? "pending" : remote.status} />}
           </div>
         </div>
       </header>

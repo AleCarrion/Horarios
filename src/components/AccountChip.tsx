@@ -18,11 +18,10 @@ export function AccountChip({ auth, status }: { auth: AuthState; status?: SyncSt
       href="/cuenta"
       aria-label={`Mi cuenta: ${auth.email}, ${role}${status ? `, ${SYNC_LABEL[status].toLowerCase()}` : ""}`}
       title={`${auth.email} · ${role}${status ? ` · ${SYNC_LABEL[status]}` : ""}`}
-      className="glass relative flex h-10 items-center gap-2 rounded-full pl-1 pr-1 transition hover:-translate-y-0.5 hover:shadow-md active:scale-95 sm:pr-3"
+      className="relative grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-2 text-lg font-bold uppercase text-white shadow-md shadow-brand/30 ring-2 ring-white/70 transition hover:-translate-y-0.5 hover:shadow-lg active:scale-95 dark:ring-white/10"
     >
-      <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-2 text-sm font-bold uppercase text-white">{auth.email[0]}</span>
-      <span className="max-w-32 truncate text-sm font-semibold max-sm:hidden">{auth.email.split("@")[0]}</span>
-      {status && <span aria-hidden="true" className={`absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full ring-2 ring-white dark:ring-slate-900 ${SYNC_DOT[status]}`} />}
+      {auth.email[0]}
+      {status && <span aria-hidden="true" className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full ring-2 ring-white dark:ring-slate-900 ${SYNC_DOT[status]}`} />}
     </Link>
   );
 }
