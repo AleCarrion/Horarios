@@ -18,6 +18,8 @@ export interface AuthState {
   signIn: (email: string) => Promise<string | null>;
   /** Classic e-mail + password. Each returns an error message in Spanish-ready form, or null. */
   signInPassword: (email: string, password: string) => Promise<string | null>;
+  /** Sign in with a Google or Apple account (leaves the page and comes back signed in). */
+  signInOAuth: (provider: "google" | "apple") => Promise<string | null>;
   /** Creates the account; `needsConfirm` is true when Supabase asks to confirm the e-mail first. */
   signUp: (email: string, password: string) => Promise<{ error: string | null; needsConfirm: boolean }>;
   resetPassword: (email: string) => Promise<string | null>;
@@ -99,6 +101,14 @@ export function useAuth(): AuthState {
     },
     [sb],
   );
+  const signInOAuth = useCallback(
+    async (provider: "google" | "apple") => {
+      if (!sb) return "Supabase no configurado";
+      const { error } = await sb.auth.signInWithOAuth({ provider, options: { redirectTo: window.location.origin } });
+      return error ? error.message : null;
+    },
+    [sb],
+  );
   const signInPassword = useCallback(
     async (mail: string, password: string) => {
       if (!sb) return "Supabase no configurado";
@@ -139,5 +149,5 @@ export function useAuth(): AuthState {
     await sb?.auth.signOut();
   }, [sb]);
 
-  return { ready, email, isEditor, isAdmin, isWorker, staffId, signIn, signInPassword, signUp, resetPassword, recovery, setPassword, signOut };
+  return { ready, email, isEditor, isAdmin, isWorker, staffId, signIn, signInOAuth, signInPassword, signUp, resetPassword, recovery, setPassword, signOut };
 }
