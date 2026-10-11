@@ -72,3 +72,5 @@ En *Authentication → Rate limits* puedes bajar el límite de correos por hora.
 | El enlace lleva a una página que no es la app | *Site URL / Redirect URL* mal puestas | Paso 1.3 |
 | Cambios «pendientes de enviar» que no se envían | Sin internet o sin permiso | Se reintenta cada 30 s; si es permiso, comprueba `editors` |
 | «No se ha podido subir (tabla: …)» | Falta una migración | Ejecuta las migraciones que falten (o `setup_all.sql` en un proyecto nuevo) |
+
+> Nota de despliegue: las variables `NEXT_PUBLIC_*` se leen al construir; tras cambiarlas en Vercel hay que desplegar de nuevo.
