@@ -9,11 +9,11 @@ import { remoteConfigured } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
 import { useRemoteCatalog } from "@/lib/useRemoteCatalog";
 import { readRequests } from "@/lib/requestsStore";
-import { AccountChip } from "./AccountChip";
-import { AppNav } from "./AppNav";
+
 import { ConfirmDialog } from "./ConfirmDialog";
-import { ArrowDown, ArrowUp, LogoMark, PaletteIcon, PlusIcon, TrashIcon } from "./icons";
+import { ArrowDown, ArrowUp, PaletteIcon, PlusIcon, TrashIcon } from "./icons";
 import { MobileTabBar } from "./MobileTabBar";
+import { PageHeader } from "./PageHeader";
 
 const field =
   "min-w-0 rounded-lg border border-line bg-card-solid px-2.5 py-2 text-sm transition hover:border-brand/50 focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-40";
@@ -31,6 +31,8 @@ const BASE_HINT: Record<Role, string> = {
   night_auditor: "Siempre de noche; cuando libra, cubre recepción.",
   mozo: "Ciclos de 5 días de trabajo y 5 de descanso.",
 };
+const ROW =
+  "flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-card-solid/70 p-3 sm:grid sm:grid-cols-[2.75rem_minmax(0,1fr)_4rem_3rem_16rem]";
 /** Shifts with hours (the rest are days without work). */
 const TIMED: BuiltinShift[] = ["M", "T", "N", "S", "P", "MZ"];
 
@@ -113,34 +115,20 @@ export function CatalogPage() {
 
   return (
     <>
-      <header className="glass sticky top-0 z-30 border-x-0 border-t-0 pt-[env(safe-area-inset-top)]">
-        <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 shadow-lg shadow-brand/30 sm:h-11 sm:w-11">
-              <LogoMark />
-            </span>
-            <div className="leading-tight">
-              <h1 className="text-lg font-bold tracking-tight">Horarios</h1>
-              <p className="text-xs text-muted">Hotel Casa 1800</p>
-            </div>
-          </div>
-          <div className="max-sm:hidden"><AppNav /></div>
-          {remoteConfigured && <div className="ml-auto"><AccountChip auth={auth} status={readOnly ? "readonly" : "synced"} /></div>}
-        </div>
-      </header>
+      <PageHeader auth={auth} status={readOnly ? "readonly" : "synced"} />
 
-      <main className="mx-auto w-full min-w-0 max-w-[1200px] p-4">
+      <main className="mx-auto w-full min-w-0 max-w-[1500px] p-4">
         {/* left edge in line with the header */}
         <div className="max-w-[820px] space-y-6">
         <div className="anim-fade-up">
-          <h2 className="flex items-center gap-2 text-xl font-bold tracking-tight sm:text-2xl"><PaletteIcon width={22} height={22} /> Turnos y puestos</h2>
+          <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight sm:text-2xl"><PaletteIcon width={22} height={22} /> Turnos y puestos</h1>
           <p className="mt-1 max-w-xl text-sm text-muted">
             Cómo se llama cada turno, qué letra y color lleva y qué horas tiene, y los puestos de tu equipo. Se guarda al momento y lo ven todos los dispositivos.
             Las reglas de descanso y de cobertura siguen en <Link href="/reglas" className="font-semibold text-brand underline-offset-2 hover:underline">Reglas</Link>.
           </p>
         </div>
 
-        <fieldset disabled={readOnly} className="contents">
+        <fieldset disabled={readOnly} className="min-w-0 space-y-10">
           <section aria-label="Turnos" className="space-y-3">
             <h3 className="text-lg font-bold">Turnos</h3>
             <p className="text-sm text-muted">El motor sigue usando los de siempre (mañana, tarde, noche…): aquí cambias cómo se ven y se llaman.</p>
@@ -149,19 +137,23 @@ export function CatalogPage() {
                 const s = draft.shifts[code];
                 const timed = TIMED.includes(code);
                 return (
-                  <li key={code} className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-card-solid/70 p-3">
+                  <li key={code} className={ROW}>
                     <Chip code={code} letter={s.letter} />
                     <input aria-label={`Nombre del turno ${DEFAULT_CATALOG.shifts[code].label}`} value={s.label} maxLength={30} onChange={(e) => setShift(code, { label: e.target.value })} className={`${field} min-w-[8rem] flex-1`} />
-                    {code !== "B" && (
+                    {code !== "B" ? (
                       <input aria-label={`Letra del turno ${DEFAULT_CATALOG.shifts[code].label}`} value={s.letter} maxLength={3} onChange={(e) => setShift(code, { letter: e.target.value })} className={`${field} w-16 text-center font-bold uppercase`} />
+                    ) : (
+                      <span className="max-sm:hidden" />
                     )}
                     <ColorField label={`Color del turno ${DEFAULT_CATALOG.shifts[code].label}`} value={s.color} onChange={(v) => setShift(code, { color: v })} />
-                    {timed && (
-                      <span className="flex items-center gap-1.5 text-sm">
+                    {timed ? (
+                      <span className="flex items-center gap-1.5 text-sm max-sm:w-full">
                         <input type="time" aria-label={`Entrada del turno ${DEFAULT_CATALOG.shifts[code].label}`} value={s.start} onChange={(e) => setShift(code, { start: e.target.value })} className={field} />
                         –
                         <input type="time" aria-label={`Salida del turno ${DEFAULT_CATALOG.shifts[code].label}`} value={s.end} onChange={(e) => setShift(code, { end: e.target.value })} className={field} />
                       </span>
+                    ) : (
+                      <span className="text-xs text-muted max-sm:hidden">Sin horario: no es un turno de trabajo</span>
                     )}
                   </li>
                 );
@@ -178,23 +170,28 @@ export function CatalogPage() {
             <ul className="space-y-2">
               {draft.custom.length === 0 && <li className="text-sm text-muted">Todavía no has creado ninguno.</li>}
               {draft.custom.map((c) => (
-                <li key={c.code} className={`flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-card-solid/70 p-3 ${c.archived ? "opacity-60" : ""}`}>
+                <li key={c.code} className={`${ROW} ${c.archived ? "opacity-60" : ""}`}>
                   <span style={{ backgroundColor: c.color, color: textOn(c.color) }} className="grid h-9 w-11 shrink-0 place-items-center rounded-lg text-sm font-bold" aria-hidden="true">{c.letter.toUpperCase()}</span>
                   <input aria-label={`Nombre del turno ${c.code}`} value={c.label} maxLength={30} onChange={(e) => setCustom(c.code, { label: e.target.value })} className={`${field} min-w-[8rem] flex-1`} />
                   <input aria-label={`Letra del turno ${c.label}`} value={c.letter} maxLength={3} onChange={(e) => setCustom(c.code, { letter: e.target.value })} className={`${field} w-16 text-center font-bold uppercase`} />
                   <ColorField label={`Color del turno ${c.label}`} value={c.color} onChange={(v) => setCustom(c.code, { color: v })} />
-                  <select aria-label={`Cuenta como, turno ${c.label}`} value={c.counts} onChange={(e) => setCustom(c.code, { counts: e.target.value as "work" | "off" })} className={field}>
-                    <option value="work">Trabajo</option>
-                    <option value="off">Sin trabajo</option>
-                  </select>
-                  <span className="flex items-center gap-1.5 text-sm">
+                  <span className="flex items-center gap-1.5 text-sm max-sm:w-full">
                     <input type="time" aria-label={`Entrada del turno ${c.label}`} value={c.start} onChange={(e) => setCustom(c.code, { start: e.target.value })} className={field} />
                     –
                     <input type="time" aria-label={`Salida del turno ${c.label}`} value={c.end} onChange={(e) => setCustom(c.code, { end: e.target.value })} className={field} />
                   </span>
-                  <button type="button" onClick={() => setCustom(c.code, { archived: !c.archived })} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold transition hover:bg-brand/10">
-                    {c.archived ? "Volver a usar" : "Dejar de usar"}
-                  </button>
+                  <div className="flex w-full flex-wrap items-center gap-2 sm:col-span-full sm:col-start-2">
+                    <label className="flex items-center gap-1.5 text-sm">
+                      <span className="text-muted">Cuenta como</span>
+                      <select aria-label={`Cuenta como, turno ${c.label}`} value={c.counts} onChange={(e) => setCustom(c.code, { counts: e.target.value as "work" | "off" })} className={field}>
+                        <option value="work">Trabajo</option>
+                        <option value="off">Sin trabajo</option>
+                      </select>
+                    </label>
+                    <button type="button" onClick={() => setCustom(c.code, { archived: !c.archived })} className="ml-auto rounded-lg border border-line px-3 py-2 text-xs font-semibold transition hover:bg-brand/10">
+                      {c.archived ? "Volver a usar" : "Dejar de usar"}
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -211,7 +208,7 @@ export function CatalogPage() {
             </p>
             <ul className="space-y-2">
               {draft.positions.map((p, i) => (
-                <li key={p.id} className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-card-solid/70 p-3">
+                <li key={p.id} className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-card-solid/70 p-3 sm:grid sm:grid-cols-[0.5rem_minmax(0,16rem)_3rem_minmax(0,1fr)_auto]">
                   <span style={{ backgroundColor: p.color }} className="h-9 w-2 shrink-0 rounded-full" aria-hidden="true" />
                   <input aria-label={`Nombre del puesto ${p.custom ? p.id : BASE_LABEL[p.base]}`} value={p.label} maxLength={30} onChange={(e) => setPosition(p.id, { label: e.target.value })} className={`${field} min-w-[8rem] flex-1`} />
                   <ColorField label={`Color del puesto ${p.label}`} value={p.color} onChange={(v) => setPosition(p.id, { color: v })} />
@@ -225,7 +222,7 @@ export function CatalogPage() {
                       </select>
                     </label>
                   ) : (
-                    <span className="text-xs text-muted">{BASE_HINT[p.base]}</span>
+                    <span className="text-xs text-muted max-sm:w-full">{BASE_HINT[p.base]}</span>
                   )}
                   <span className="ml-auto flex items-center gap-1">
                     <button type="button" disabled={i === 0} onClick={() => movePosition(p.id, -1)} aria-label={`Subir el puesto ${p.label}`} className="grid h-9 w-9 place-items-center rounded-lg text-muted transition hover:bg-brand/10 disabled:opacity-30"><ArrowUp width={16} height={16} /></button>

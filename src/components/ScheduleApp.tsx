@@ -665,10 +665,10 @@ export function ScheduleApp() {
 
         <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 text-xs sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 print:hidden" aria-label="Leyenda">
           {legendCodes().map((c) => (
-            <li key={c} className="glass flex shrink-0 items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2.5 text-xs font-medium sm:gap-2 sm:py-1 sm:pl-1 sm:pr-3 transition hover:-translate-y-0.5 hover:shadow-md">
+            <li key={c} title={SHIFTS[c].start ? `${SHIFTS[c].label} ${SHIFTS[c].start}–${SHIFTS[c].end}` : SHIFTS[c].label} className="glass flex shrink-0 items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2.5 text-xs font-medium">
               <span style={shiftPaint(c)} className="grid h-6 w-7 place-items-center rounded-full text-[11px] font-bold">{displayCode(c)}</span>
               {SHIFTS[c].label}
-              {SHIFTS[c].start && <span className="text-muted max-sm:hidden">{SHIFTS[c].start}–{SHIFTS[c].end}</span>}
+              {SHIFTS[c].start && <span className="hidden text-muted min-[1700px]:inline">{SHIFTS[c].start}–{SHIFTS[c].end}</span>}
             </li>
           ))}
         </ul>

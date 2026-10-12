@@ -85,7 +85,7 @@ export function AccessPage() {
   return (
     <>
       <header className="glass sticky top-0 z-30 border-x-0 border-t-0 pt-[env(safe-area-inset-top)]">
-        <div className="mx-auto flex w-full max-w-[1200px] items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex w-full max-w-[1500px] items-center gap-3 px-4 py-3">
           <span className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 shadow-lg shadow-brand/30">
             <LogoMark />
           </span>
@@ -97,7 +97,7 @@ export function AccessPage() {
         </div>
       </header>
 
-      <main className="mx-auto w-full min-w-0 max-w-[1200px] p-4">
+      <main className="mx-auto w-full min-w-0 max-w-[1500px] p-4">
         {/* left edge in line with the header */}
         <div className="max-w-[720px] space-y-5">
         <div className="anim-fade-up">

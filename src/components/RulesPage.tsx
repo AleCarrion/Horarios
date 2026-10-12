@@ -8,10 +8,10 @@ import { readRules, writeRules } from "@/lib/rulesStore";
 import { remoteConfigured } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
 import { useRemoteRules } from "@/lib/useRemoteRules";
-import { AccountChip } from "./AccountChip";
-import { AppNav } from "./AppNav";
-import { LogoMark, PaletteIcon, PlusIcon, TrashIcon } from "./icons";
+
+import { PaletteIcon, PlusIcon, TrashIcon } from "./icons";
 import { MobileTabBar } from "./MobileTabBar";
+import { PageHeader } from "./PageHeader";
 
 const MONTH_NAMES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const describe = (h: string) => {
@@ -73,27 +73,13 @@ export function RulesPage() {
 
   return (
     <>
-      <header className="glass sticky top-0 z-30 border-x-0 border-t-0 pt-[env(safe-area-inset-top)]">
-        <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 shadow-lg shadow-brand/30 sm:h-11 sm:w-11">
-              <LogoMark />
-            </span>
-            <div className="leading-tight">
-              <h1 className="text-lg font-bold tracking-tight">Horarios</h1>
-              <p className="text-xs text-muted">Hotel Casa 1800</p>
-            </div>
-          </div>
-          <div className="max-sm:hidden"><AppNav /></div>
-          {remoteConfigured && <div className="ml-auto"><AccountChip auth={auth} status={readOnly ? "readonly" : "synced"} /></div>}
-        </div>
-      </header>
+      <PageHeader auth={auth} status={readOnly ? "readonly" : "synced"} />
 
-      <main className="mx-auto w-full min-w-0 max-w-[1200px] p-4">
+      <main className="mx-auto w-full min-w-0 max-w-[1500px] p-4">
         {/* left edge in line with the header */}
         <div className="max-w-[820px] space-y-5">
         <div className="anim-fade-up">
-          <h2 className="text-xl font-bold tracking-tight sm:text-2xl">Reglas del horario</h2>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Reglas del horario</h1>
           <p className="mt-1 max-w-xl text-sm text-muted">
             Lo que el generador respeta y lo que avisa si no se cumple. Se guarda al momento. Los meses ya guardados no cambian solos: los avisos sí se recalculan, y puedes usar «Arreglar avisos» o «Generar automático».
           </p>
@@ -108,7 +94,7 @@ export function RulesPage() {
           <span aria-hidden="true" className="text-muted">›</span>
         </Link>
 
-        <fieldset disabled={readOnly} className="contents">
+        <fieldset disabled={readOnly} className="min-w-0 space-y-5">
         <section aria-label="Descansos y rachas" className="space-y-3">
           <Stepper label="Máximo de días libres seguidos" hint="Más de esto sale como aviso (los mozos y las vacaciones no cuentan)." value={rules.maxRestRun} min={1} max={7} onChange={(n) => change({ maxRestRun: n })} />
           <Stepper label="Máximo de días trabajados seguidos" hint="Por encima de esto, aviso. El generador solo llega aquí si no puede cubrir un turno de otra forma." value={rules.maxWorkRun} min={3} max={10} onChange={(n) => change({ maxWorkRun: n })} />

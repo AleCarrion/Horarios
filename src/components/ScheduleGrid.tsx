@@ -198,18 +198,18 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
   const cellLabel = (s: Staff, d: string, code: ShiftCode) => `${s.name}, ${d}, ${SHIFTS[code].label} ${displayCode(code)}`;
 
   return (
-    <div className="glass anim-fade-up overflow-hidden rounded-2xl shadow-[0_18px_50px_-20px_rgba(11,79,138,0.35)]" style={{ animationDelay: "120ms" }}>
+    <div className="glass anim-fade-up overflow-hidden rounded-2xl shadow-[0_18px_50px_-24px_rgba(80,58,24,0.35)]" style={{ animationDelay: "120ms" }}>
       <div className="overflow-x-auto px-2 pb-2 pt-1">
         <table
           ref={tableRef}
-          className={`schedule-table border-separate text-sm [border-spacing:3px] ${compact ? "w-full" : ""}`}
+          className="schedule-table w-full border-separate text-sm [border-spacing:3px]"
           onPointerOver={onHover}
           onPointerLeave={clearHover}
         >
           <caption className="sr-only">Horario mensual por persona y día</caption>
           <thead>
             <tr>
-              <th scope="col" className={`sticky left-0 z-20 rounded-xl bg-card-solid p-2 text-left text-xs font-semibold uppercase tracking-wider text-muted ${compact ? "w-[7.5rem] min-w-0" : "min-w-36"}`}>
+              <th scope="col" className={`sticky left-0 z-20 rounded-xl bg-card-solid p-2 text-left text-xs font-semibold uppercase tracking-wider text-muted ${compact ? "w-[7.5rem] min-w-0" : "w-44 min-w-36"}`}>
                 Equipo
               </th>
               {cols.map((d) => {
@@ -220,7 +220,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                     scope="col"
                     data-colhead={d}
                     title={isHoliday(d, holidays) ? "Festivo" : undefined}
-                    className={`${compact ? "min-w-0" : "min-w-9"} rounded-xl px-0.5 py-1.5 text-center font-semibold transition-colors ${
+                    className={`${compact ? "min-w-0" : "min-w-7"} rounded-xl px-0.5 py-1.5 text-center font-semibold transition-colors ${
                       isToday
                         ? "bg-gradient-to-b from-brand to-brand-2 text-white shadow-md"
                         : isHoliday(d, holidays)
@@ -321,7 +321,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                         aria-label={`${cellLabel(s, d, code)}${locked?.[s.id]?.[d] ? ", bloqueada" : ""}`}
                         onClick={(e) => openMenu(e, s.id, d)}
                         style={code === "B" ? undefined : shiftPaint(code)}
-                        className={`relative flex ${compact ? "h-12 w-full min-w-0 text-base" : "h-9 w-9"} items-center justify-center rounded-lg text-[13px] font-bold tracking-tight shadow-[inset_0_-2px_0_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.35)] transition-[transform,box-shadow] duration-150 enabled:cursor-pointer enabled:hover:z-10 enabled:hover:-translate-y-0.5 enabled:hover:scale-110 enabled:hover:shadow-lg enabled:active:scale-95 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+                        className={`relative flex ${compact ? "h-12 w-full min-w-0 text-base" : "h-9 w-full min-w-7"} items-center justify-center rounded-lg text-[13px] font-bold tracking-tight shadow-[inset_0_-2px_0_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.35)] transition-[transform,box-shadow] duration-150 enabled:cursor-pointer enabled:hover:z-10 enabled:hover:-translate-y-0.5 enabled:hover:scale-110 enabled:hover:shadow-lg enabled:active:scale-95 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
                           code === "B" ? "bg-[repeating-linear-gradient(135deg,#0b0b0b_0_5px,#1f1f1f_5px_10px)]" : ""
                         } ${bad.has(`${s.id}|${d}`) ? "anim-alert ring-2 ring-red-600" : ""} ${preview?.has(`${s.id}|${d}`) ? "ring-[3px] ring-accent ring-offset-1 ring-offset-card-solid" : ""}`}
                       >

@@ -4,9 +4,10 @@ import { useEffect, useState, type ReactNode } from "react";
 import { getStoredRole } from "@/lib/session";
 import { SHIFTS, displayCode } from "@/lib/domain/types";
 import { legendCodes, shiftPaint } from "@/lib/domain/catalog";
-import { AppNav } from "./AppNav";
-import { LogoMark, PrinterIcon } from "./icons";
+
+import { PrinterIcon } from "./icons";
 import { MobileTabBar } from "./MobileTabBar";
+import { PageHeader } from "./PageHeader";
 
 type Who = "jefa" | "trabajador";
 
@@ -115,22 +116,10 @@ export function HelpPage() {
 
   return (
     <>
-      <header className="glass sticky top-0 z-30 border-x-0 border-t-0 pt-[env(safe-area-inset-top)] print:hidden">
-        <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 shadow-lg shadow-brand/30 sm:h-11 sm:w-11">
-              <LogoMark />
-            </span>
-            <div className="leading-tight">
-              <p className="text-lg font-bold tracking-tight">Horarios</p>
-              <p className="text-xs text-muted">Hotel Casa 1800</p>
-            </div>
-          </div>
-          <div className="max-sm:hidden"><AppNav /></div>
-        </div>
-      </header>
+      <PageHeader />
 
-      <main className="help-sheet mx-auto w-full min-w-0 max-w-[820px] space-y-5 p-4 print:max-w-none print:space-y-3 print:p-0">
+      <main className="help-sheet mx-auto w-full min-w-0 max-w-[1500px] p-4 print:max-w-none print:p-0">
+        <div className="max-w-[820px] space-y-5 print:max-w-none print:space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold tracking-tight sm:text-2xl print:text-lg">{who === "jefa" ? "Manual para la jefa" : "Manual para los trabajadores"}</h1>
@@ -148,6 +137,7 @@ export function HelpPage() {
         </div>
 
         {who === "jefa" ? <ForBoss /> : <ForWorker />}
+        </div>
       </main>
       <MobileTabBar />
     </>

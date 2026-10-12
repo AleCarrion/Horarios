@@ -13,7 +13,7 @@ function Ring({ pct }: { pct: number }) {
   const r = 22;
   const c = 2 * Math.PI * r;
   return (
-    <svg viewBox="0 0 56 56" className="h-9 w-9 shrink-0 sm:h-14 sm:w-14" role="img" aria-label={`${pct}% de cobertura`}>
+    <svg viewBox="0 0 56 56" className="h-14 w-14 shrink-0 max-sm:hidden" role="img" aria-label={`${pct}% de cobertura`}>
       <circle cx="28" cy="28" r={r} fill="none" stroke="currentColor" strokeOpacity=".12" strokeWidth="6" />
       <circle
         cx="28"
@@ -65,7 +65,7 @@ export function StatCards({ coveragePct, covered, total, issues, people }: Props
         <Ring pct={coveragePct} />
         <div>
           <div className="text-[11px] font-medium text-muted sm:text-xs">Cobertura</div>
-          <div className="text-sm font-bold leading-tight text-foreground sm:text-xl">{coveragePct === 100 ? "Completa" : "Con huecos"}</div>
+          <div className="text-sm font-bold leading-tight text-foreground sm:text-xl"><span className="sm:hidden">{coveragePct} %</span><span className="max-sm:hidden">{coveragePct === 100 ? "Completa" : "Con huecos"}</span></div>
         </div>
       </div>
       <Card delay={60} icon={<ClockIcon />} label="Turnos cubiertos">
@@ -78,7 +78,7 @@ export function StatCards({ coveragePct, covered, total, issues, people }: Props
         label="Avisos"
         tone={issues ? "bg-red-500/15 text-red-600" : "bg-emerald-500/15 text-emerald-600"}
       >
-        {issues === 0 ? "Todo en orden" : issues}
+        {issues === 0 ? <><span className="sm:hidden">Ninguno</span><span className="max-sm:hidden">Todo en orden</span></> : issues}
       </Card>
       <Card delay={180} icon={<UsersIcon />} label="Personas este mes" tone="bg-accent/15 text-accent" className="max-sm:hidden">
         {people}

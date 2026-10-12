@@ -11,12 +11,12 @@ import { remoteConfigured } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
 import { useTeam } from "@/lib/useTeam";
 import { useEffect } from "react";
-import { AccountChip } from "./AccountChip";
-import { AppNav } from "./AppNav";
+
 import { MobileTabBar } from "./MobileTabBar";
 import { readRequests } from "@/lib/requestsStore";
-import { ArrowDown, ArrowUp, GripIcon, LogoMark, PlusIcon, UsersIcon } from "./icons";
+import { ArrowDown, ArrowUp, GripIcon, PlusIcon, UsersIcon } from "./icons";
 import { PlanDialog } from "./PlanDialog";
+import { PageHeader } from "./PageHeader";
 
 const ROLE_RULES: Record<Role, string> = {
   director: "Supervisión de lunes a viernes (9:15–17:15). Libra fines de semana y festivos. Nunca noches.",
@@ -138,12 +138,12 @@ export function TeamPage() {
           setDragId(null);
           setOverId(null);
         }}
-        className={`anim-fade-up group rounded-2xl border bg-card-solid/70 p-3 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
+        className={`anim-fade-up group rounded-2xl border bg-card-solid/70 p-3 transition duration-200 min-[1400px]:flex min-[1400px]:items-center min-[1400px]:gap-4 hover:-translate-y-0.5 hover:shadow-lg ${
           overId === p.id ? "border-accent shadow-[0_-3px_0_0_var(--accent)]" : "border-line"
         } ${dragId === p.id ? "opacity-40" : ""}`}
         style={{ animationDelay: `${i * 35}ms` }}
       >
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 min-[1400px]:min-w-0 min-[1400px]:flex-1">
           {!readOnly && <GripIcon width={16} height={16} className="cursor-grab text-muted opacity-40 transition group-hover:opacity-100 active:cursor-grabbing [@media(hover:none)]:hidden" aria-hidden="true" />}
           <span aria-hidden="true" style={{ backgroundImage: positionGradient(sectionOf(p).color), color: textOn(sectionOf(p).color) }} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold shadow">
             {initials(p.name)}
@@ -185,7 +185,7 @@ export function TeamPage() {
             </div>
           </div>
         </div>
-        <div className="mt-3 grid grid-cols-2 items-end gap-x-3 gap-y-2 border-t border-line pt-3 text-xs text-muted sm:flex sm:flex-wrap sm:items-center sm:gap-x-4">
+        <div className="mt-3 grid grid-cols-2 items-end gap-x-3 gap-y-2 border-t border-line pt-3 text-xs text-muted sm:flex sm:flex-wrap sm:items-center sm:gap-x-4 min-[1400px]:mt-0 min-[1400px]:flex-nowrap min-[1400px]:border-l min-[1400px]:border-t-0 min-[1400px]:pl-4 min-[1400px]:pt-0">
           <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
             Alta
             <input type="date" aria-label={`Alta de ${p.name}`} value={p.activeFrom ?? ""} disabled={readOnly} onChange={(e) => propose(updateStaff(staff, p.id, { activeFrom: e.target.value || undefined }), `${p.name}: alta`)} className={field} />
@@ -199,7 +199,7 @@ export function TeamPage() {
             disabled={readOnly || Boolean(p.activeTo)}
             onClick={() => propose(updateStaff(staff, p.id, { activeTo: addDay(editableStart(), -1) }), `${p.name}: baja`)}
             aria-label={`Dar de baja a ${p.name}`}
-            className="col-span-2 rounded-lg px-3 py-2.5 font-semibold text-red-600 transition hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-30 max-sm:border max-sm:border-red-500/30 sm:col-span-1 sm:ml-auto sm:py-1.5"
+            className="col-span-2 justify-self-end rounded-lg px-3 py-1.5 font-semibold text-red-600 transition hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-30 sm:col-span-1 sm:ml-auto"
           >
             Dar de baja
           </button>
@@ -207,7 +207,6 @@ export function TeamPage() {
       </li>
     );
   };
-
 
   const rules = (
     <ul className="mt-3 space-y-3">
@@ -225,34 +224,19 @@ export function TeamPage() {
 
   return (
     <>
-      <header className="glass sticky top-0 z-30 border-x-0 border-t-0 pt-[env(safe-area-inset-top)]">
-        <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 shadow-lg shadow-brand/30 sm:h-11 sm:w-11">
-              <LogoMark />
-            </span>
-            <div className="leading-tight">
-              <h1 className="text-lg font-bold tracking-tight">Horarios</h1>
-              <p className="text-xs text-muted">Hotel Casa 1800</p>
-            </div>
-          </div>
-          <div className="max-sm:hidden"><AppNav /></div>
-          {remoteConfigured && <div className="ml-auto"><AccountChip auth={auth} status={readOnly ? "readonly" : pending ? "pending" : "synced"} /></div>}
-        </div>
-      </header>
+      <PageHeader auth={auth} status={readOnly ? "readonly" : pending ? "pending" : "synced"} />
 
-      <main className="mx-auto w-full min-w-0 max-w-[1200px] space-y-5 p-4">
+      <main className="mx-auto w-full min-w-0 max-w-[1500px] space-y-5 p-4">
 
         <div className="anim-fade-up flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-xl font-bold tracking-tight sm:text-2xl">Equipo</h2>
+            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Equipo</h1>
             <p className="mt-1 max-w-xl text-sm text-muted">
               Quién trabaja en el hotel, en qué puesto y desde cuándo.<span className="max-sm:hidden"> Arrastra a una persona para reordenarla o cambiarla de puesto: el horario se reajusta alrededor y ves los cambios antes de aplicarlos.</span><span className="sm:hidden"> Cambiar el puesto o las fechas reajusta el horario y ves los cambios antes de aplicarlos.</span>
             </p>
           </div>
 
         </div>
-
 
         <button
           onClick={() => setAdding(true)}

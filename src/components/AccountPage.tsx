@@ -8,11 +8,10 @@ import { remoteConfigured } from "@/lib/supabase";
 import { SYNC_DOT, SYNC_LABEL, type SyncStatus } from "@/lib/syncStatus";
 import { useAuth } from "@/lib/useAuth";
 import { readQueue } from "@/lib/useRemoteSchedule";
-import { AccountChip } from "./AccountChip";
-import { AppNav } from "./AppNav";
-import { LogoMark } from "./icons";
+
 import { MobileTabBar } from "./MobileTabBar";
 import { readRequests } from "@/lib/requestsStore";
+import { PageHeader } from "./PageHeader";
 
 /** Who is signed in, what they can do, and sign out / change password. */
 export function AccountPage() {
@@ -55,26 +54,12 @@ export function AccountPage() {
 
   return (
     <>
-      <header className="glass sticky top-0 z-30 border-x-0 border-t-0 pt-[env(safe-area-inset-top)]">
-        <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 shadow-lg shadow-brand/30 sm:h-11 sm:w-11">
-              <LogoMark />
-            </span>
-            <div className="leading-tight">
-              <h1 className="text-lg font-bold tracking-tight">Horarios</h1>
-              <p className="text-xs text-muted">Hotel Casa 1800</p>
-            </div>
-          </div>
-          <div className="max-sm:hidden"><AppNav /></div>
-          {remoteConfigured && auth.email && <div className="ml-auto"><AccountChip auth={auth} status="synced" /></div>}
-        </div>
-      </header>
+      <PageHeader auth={auth} status={"synced"} />
 
-      <main className="mx-auto w-full min-w-0 max-w-[1200px] p-4">
+      <main className="mx-auto w-full min-w-0 max-w-[1500px] p-4">
         {/* left edge in line with the header */}
         <div className="max-w-[560px] space-y-5">
-        <h2 className="anim-fade-up text-xl font-bold tracking-tight sm:text-2xl">Mi cuenta</h2>
+        <h1 className="anim-fade-up text-xl font-bold tracking-tight sm:text-2xl">Mi cuenta</h1>
 
         {!remoteConfigured ? (
           <p className="glass rounded-2xl p-5 text-sm">La aplicación funciona ahora en modo local: los datos se guardan en este dispositivo y no hace falta iniciar sesión.</p>
