@@ -167,6 +167,14 @@ export function ScheduleApp() {
     setRules(r);
     writeRules(r);
   });
+  // A month marked as published that never reached the database (offline, or it failed) is uploaded as soon as possible
+  const { draft: remoteDraft, publish: remotePublish } = remote;
+  useEffect(() => {
+    if (monthState?.state !== "published" || !remoteDraft) return;
+    void remotePublish();
+    const t = setInterval(() => void remotePublish(), 20000);
+    return () => clearInterval(t);
+  }, [monthState?.state, remoteDraft, remotePublish]);
   const setState = (s: MonthState | null) => {
     setMonthState(s);
     writeMonthState(ym.year, ym.month, s);
@@ -624,6 +632,12 @@ export function ScheduleApp() {
             </li>
           ))}
         </ul>
+
+        {remote.publishError && (
+          <p role="alert" className="glass anim-fade-up rounded-xl px-3 py-2 text-sm font-semibold text-red-600 print:hidden">
+            No se ha podido publicar el mes para los demás: {remote.publishError}. Se reintenta solo.
+          </p>
+        )}
 
         {remote.conflicts > 0 && (
           <p role="status" className="glass anim-fade-up flex flex-wrap items-center gap-x-3 rounded-xl border-amber-400/60 px-3 py-2 text-sm print:hidden">

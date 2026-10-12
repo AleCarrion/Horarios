@@ -43,6 +43,7 @@ export function useRemoteSchedule({ year, month, present, auth, onLoaded, onRemo
   const [conflicts, setConflicts] = useState(0);
   // bumped to load the month again (a reader waiting for the boss to publish)
   const [tick, setTick] = useState(0);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const waiting = useRef(false);
   useEffect(() => {
     waiting.current = unpublished;
@@ -194,13 +195,17 @@ export function useRemoteSchedule({ year, month, present, auth, onLoaded, onRemo
   }, [canEdit, flush]);
 
   const publish = useCallback(async () => {
-    if (!sb || !canEdit) return;
+    if (!sb || !canEdit) return false;
     const rows = scheduleToRows(present);
     const { error } = await sb.from("monthly_schedule").upsert(rows, { onConflict: "staff_id,day" });
-    if (!error) {
-      base.current = present;
-      setDraft(false);
+    if (error) {
+      setPublishError(error.message);
+      return false;
     }
+    setPublishError(null);
+    base.current = present;
+    setDraft(false);
+    return true;
   }, [sb, canEdit, present]);
 
   const status = !remoteConfigured
@@ -213,7 +218,7 @@ export function useRemoteSchedule({ year, month, present, auth, onLoaded, onRemo
           ? "pending"
           : "synced";
 
-  return { status, canEdit, draft, unpublished, publish, conflicts, clearConflicts: () => setConflicts(0) } as const;
+  return { status, canEdit, draft, unpublished, publish, publishError, conflicts, clearConflicts: () => setConflicts(0) } as const;
 }
 
 export type { ShiftCode };
