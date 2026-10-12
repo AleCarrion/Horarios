@@ -29,7 +29,7 @@ import { useRemoteSchedule } from "@/lib/useRemoteSchedule";
 import { AccountChip } from "./AccountChip";
 import { useRouter } from "next/navigation";
 import { ExportMenu } from "./ExportMenu";
-import { ChevronLeft, ChevronRight, CheckIcon, ClockIcon, DownloadIcon, InboxIcon, LockIcon, LogoMark, MoreIcon, PrinterIcon, TableIcon, RedoIcon, SparklesIcon, UndoIcon, UsersIcon } from "./icons";
+import { ChevronLeft, ChevronRight, CheckIcon, ClockIcon, DownloadIcon, InboxIcon, LockIcon, LogoMark, MoreIcon, PrinterIcon, TableIcon, RedoIcon, SparklesIcon, UndoIcon, UsersIcon, HelpIcon } from "./icons";
 import { RequestsPanel } from "./RequestsPanel";
 import { MyRequestsPanel } from "./MyRequestsPanel";
 import { ActionSheet, type SheetAction } from "./ActionSheet";
@@ -500,6 +500,7 @@ export function ScheduleApp() {
     ...(w || remoteReadOnly ? [] : [{ label: "Restaurar copia de seguridad", icon: <DownloadIcon />, onClick: () => restoreInput.current?.click() }]),
     ...(!w && remote.draft ? [{ label: "Publicar mes", icon: <DownloadIcon />, onClick: () => void remote.publish() }] : []),
     ...(remoteConfigured ? [{ label: auth.email ? `Mi cuenta (${auth.email})` : "Entrar", icon: <UsersIcon />, onClick: () => router.push(auth.email ? "/cuenta" : "/entrar") }] : []),
+    { label: "Ayuda (manual de una hoja)", icon: <HelpIcon />, onClick: () => router.push("/ayuda") },
     ...(w ? [] : [{ label: "Historial de cambios", icon: <ClockIcon />, onClick: () => setHistoryOpen(true) }]),
     ...(w ? [] : [{ label: "Generar automático", hint: "Rehace el calendario del mes", icon: <SparklesIcon />, onClick: () => setConfirmRegenerate(true), disabled: readOnly, tone: "accent" as const }]),
   ];

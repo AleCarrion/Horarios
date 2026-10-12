@@ -4,12 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getStoredRole } from "@/lib/session";
-import { CalendarIcon, SlidersIcon, UsersIcon } from "./icons";
+import { CalendarIcon, HelpIcon, SlidersIcon, UsersIcon } from "./icons";
 
 const LINKS = [
   { href: "/", label: "Horario", Icon: CalendarIcon },
   { href: "/equipo", label: "Equipo", Icon: UsersIcon },
   { href: "/reglas", label: "Reglas", Icon: SlidersIcon },
+  { href: "/ayuda", label: "Ayuda", Icon: HelpIcon },
 ];
 
 /** Horario / Equipo tabs shared by every page header. */
@@ -21,7 +22,7 @@ export function AppNav() {
   }, []);
   return (
     <nav aria-label="Secciones" className="flex items-center gap-1 rounded-2xl border border-line bg-card-solid/60 p-1">
-      {LINKS.filter((l) => !worker || l.href === "/").map(({ href, label, Icon }) => {
+      {LINKS.filter((l) => !worker || l.href === "/" || l.href === "/ayuda").map(({ href, label, Icon }) => {
         const active = path === href;
         return (
           <Link

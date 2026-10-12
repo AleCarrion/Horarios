@@ -106,6 +106,11 @@ export function AccountPage() {
               </Link>
             )}
 
+            <Link href="/ayuda" className="glass anim-fade-up block rounded-2xl px-4 py-3 font-semibold transition hover:-translate-y-0.5 hover:shadow-md">
+              Ayuda
+              <span className="block text-sm font-normal text-muted">Cómo usar la aplicación, en una hoja.</span>
+            </Link>
+
             <form onSubmit={change} className="glass anim-fade-up space-y-3 rounded-2xl p-4">
               <h3 className="font-semibold">Cambiar la contraseña</h3>
               <label className="sr-only" htmlFor="acc-pw">Contraseña nueva</label>

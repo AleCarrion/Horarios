@@ -126,6 +126,12 @@ body {
   size: A4 landscape;
   margin: 8mm;
 }
+/* the manual is a portrait sheet */
+@page help {
+  size: A4 portrait;
+  margin: 14mm;
+}
+.help-sheet { page: help; }
 
 @media print {
   html, body {

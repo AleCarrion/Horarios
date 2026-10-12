@@ -202,6 +202,17 @@ test("comparar meses: tabla con lo que cambia de cada persona", async ({ page })
   await expect(panel).toHaveCount(0);
 });
 
+test("la ayuda tiene el manual de la jefa y el de los trabajadores", async ({ page }) => {
+  await page.goto("/ayuda");
+  await expect(page.getByRole("heading", { name: "Manual para la jefa" })).toBeVisible();
+  await expect(page.getByText("Peticiones de los trabajadores")).toBeVisible();
+  await page.getByRole("button", { name: "Para los trabajadores" }).click();
+  await expect(page.getByRole("heading", { name: "Manual para los trabajadores" })).toBeVisible();
+  await expect(page.getByText("Crear tu cuenta")).toBeVisible();
+  await expect(page.getByRole("list", { name: "Qué significan las letras" })).toHaveCount(0); // the legend is a section, not a list
+  await expect(page.getByRole("region", { name: "Qué significan las letras" })).toBeVisible();
+});
+
 test("la página de equipo lista la plantilla", async ({ page }) => {
   await page.goto("/equipo");
   await expect(page.getByRole("heading", { name: "Equipo" })).toBeVisible();
