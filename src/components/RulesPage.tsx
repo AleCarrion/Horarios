@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DEFAULT_RULES, isHolidayEntry, normalizeRules, type Rules } from "@/lib/domain/ruleset";
 import { readRequests } from "@/lib/requestsStore";
@@ -9,7 +10,7 @@ import { useAuth } from "@/lib/useAuth";
 import { useRemoteRules } from "@/lib/useRemoteRules";
 import { AccountChip } from "./AccountChip";
 import { AppNav } from "./AppNav";
-import { LogoMark, PlusIcon, TrashIcon } from "./icons";
+import { LogoMark, PaletteIcon, PlusIcon, TrashIcon } from "./icons";
 import { MobileTabBar } from "./MobileTabBar";
 
 const MONTH_NAMES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -95,6 +96,15 @@ export function RulesPage() {
             Lo que el generador respeta y lo que avisa si no se cumple. Se guarda al momento. Los meses ya guardados no cambian solos: los avisos sí se recalculan, y puedes usar «Arreglar avisos» o «Generar automático».
           </p>
         </div>
+
+        <Link href="/turnos" className="flex items-center gap-3 rounded-2xl border border-line bg-card-solid/70 p-4 transition hover:border-brand/50">
+          <PaletteIcon width={20} height={20} className="shrink-0 text-brand" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Turnos y puestos</span>
+            <span className="block text-sm text-muted">Nombres, letras, colores y horas de los turnos; turnos y puestos propios del hotel.</span>
+          </span>
+          <span aria-hidden="true" className="text-muted">›</span>
+        </Link>
 
         <fieldset disabled={readOnly} className="contents">
         <section aria-label="Descansos y rachas" className="space-y-3">

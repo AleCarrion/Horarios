@@ -4,12 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getStoredRole } from "@/lib/session";
-import { CalendarIcon, HelpIcon, SlidersIcon, UsersIcon } from "./icons";
+import { CalendarIcon, HelpIcon, PaletteIcon, SlidersIcon, UsersIcon } from "./icons";
 
 const LINKS = [
   { href: "/", label: "Horario", Icon: CalendarIcon },
   { href: "/equipo", label: "Equipo", Icon: UsersIcon },
   { href: "/reglas", label: "Reglas", Icon: SlidersIcon },
+  { href: "/turnos", label: "Turnos", Icon: PaletteIcon },
   { href: "/ayuda", label: "Ayuda", Icon: HelpIcon },
 ];
 

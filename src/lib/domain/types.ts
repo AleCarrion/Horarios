@@ -38,7 +38,7 @@ export interface ShiftDef {
 }
 
 /** Live table of shifts: starts as the defaults and is rewritten by `applyCatalog` with the hotel's names, hours and colours. */
-export const SHIFTS: Record<string, ShiftDef> = {
+const SHIFT_TABLE: Record<string, ShiftDef> = {
   M: { code: "M", label: "Mañana", start: "07:00", end: "15:00" },
   T: { code: "T", label: "Tarde", start: "15:00", end: "23:00" },
   N: { code: "N", label: "Noche", start: "23:00", end: "07:00" },
@@ -50,6 +50,15 @@ export const SHIFTS: Record<string, ShiftDef> = {
   A: { code: "A", label: "Ausencia / baja", start: "", end: "" },
   B: { code: "B", label: "Fuera de plantilla", start: "", end: "" },
 };
+
+/**
+ * A shift code that is not known (yet): shown with its own code, in grey. It happens for a moment when another device has
+ * created a shift and its cells arrive before the hotel's catalog does.
+ */
+const UNKNOWN = (code: string): ShiftDef => ({ code, label: code, start: "", end: "", color: "#a3a3a3" });
+export const SHIFTS: Record<string, ShiftDef> = new Proxy(SHIFT_TABLE, {
+  get: (t, k) => (typeof k === "string" ? (t[k] ?? UNKNOWN(k)) : undefined),
+});
 
 /** staffId -> (YYYY-MM-DD -> shift) */
 export type Schedule = Record<string, Record<string, ShiftCode>>;

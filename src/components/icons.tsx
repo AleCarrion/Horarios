@@ -113,3 +113,7 @@ export const SlidersIcon = (p: SVGProps<SVGSVGElement>) => (
 export const HelpIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)} {...p}><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1.9-1.1 1.8M12 17h.01" /></svg>
 );
+
+export const PaletteIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)} {...p}><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7H17a4 4 0 0 0 4-4c0-4.4-4-8.2-9-8.2Z" /><path d="M7.5 11h.01M10 7.5h.01M14.5 7.5h.01" /></svg>
+);

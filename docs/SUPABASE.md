@@ -106,3 +106,7 @@ En *Authentication → Rate limits* puedes bajar el límite de correos por hora.
 Desde la migración `0010_login_required.sql` **nadie ve nada sin iniciar sesión** con un correo que el admin haya dado de alta (administradora, editora o trabajador). Quien entra con una cuenta sin permiso ve «Todavía no tienes acceso». Ya no existe «Solo quiero ver el horario».
 
 Orden para actualizar un proyecto que ya funciona: 1) espera a que Vercel termine de desplegar esta versión; 2) ejecuta `supabase/migrations/0010_login_required.sql` en el editor SQL. Si el admin ve un aviso rojo «a la base de datos le falta una actualización», es que falta ese paso.
+
+## Turnos y puestos del hotel (migración 0011)
+
+La página **Turnos** guarda en la tabla `app_catalog` (una fila) los nombres, letras, colores y horas de los turnos y los puestos del hotel; los turnos propios se dan de alta además en `shifts` (el cuadrante los referencia) y cada persona puede tener un `position` propio en `staff`. Ejecuta `supabase/migrations/0011_catalog.sql` (o regenera `setup_all.sql` con `npm run db:bundle` en un proyecto nuevo). Si falta, el admin ve el aviso rojo de «falta una actualización».

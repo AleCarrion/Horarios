@@ -84,7 +84,10 @@ describe("catálogo: se aplica a toda la app", () => {
     expect(isOff("X2")).toBe(true);
     expect(legendCodes()).toContain("X1");
     applyCatalog(DEFAULT_CATALOG);
-    expect(SHIFTS.X1).toBeUndefined();
+    // a code nobody knows (a shift created on another device whose catalog has not arrived yet) is shown grey, not a crash
+    expect(SHIFTS.X1).toMatchObject({ label: "X1", color: "#a3a3a3" });
+    expect(SHIFTS.X1.custom).toBeUndefined();
+    expect(displayCode("X1")).toBe("X1");
   });
 
   it("un turno archivado sigue pintándose pero ya no se ofrece", () => {

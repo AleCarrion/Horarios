@@ -29,7 +29,7 @@ export function toStaffRows(staff: Staff[]): StaffRow[] {
     active_to: s.activeTo ?? null,
     extra_shifts: s.extraShifts ?? null,
     max_covers: s.maxCovers ?? null,
-    position: s.position ?? null,
+    ...(s.position ? { position: s.position } : {}), // omitted when empty: the column exists only from migration 0011
   }));
 }
 

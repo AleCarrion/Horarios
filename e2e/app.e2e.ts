@@ -245,3 +245,38 @@ test.describe("móvil", () => {
     expect(Math.abs(centre - 422)).toBeLessThan(80);
   });
 });
+
+test("turnos y puestos: renombrar un turno, crear uno propio y usarlo en una casilla", async ({ page, viewport }) => {
+  test.skip((viewport?.width ?? 1280) < 640, "la cuadrícula completa es de escritorio");
+  await page.goto("/turnos");
+  await page.waitForSelector("main");
+  await page.getByLabel("Nombre del turno Mañana").fill("Madrugada");
+  await page.getByLabel("Letra del turno Mañana").fill("ma");
+  await page.getByRole("button", { name: "Añadir turno" }).click();
+  await page.getByLabel("Nombre del turno X1").fill("Desayunos");
+  await page.getByLabel("Letra del turno Desayunos").fill("dz");
+  await expect(page.getByRole("status")).toHaveText("Guardado", { timeout: 5000 });
+
+  await open(page);
+  await expect(page.getByLabel("Leyenda")).toContainText("Madrugada");
+  await expect(page.getByLabel("Leyenda")).toContainText("Desayunos");
+  const day = await lateDay(page);
+  await page.locator(`[data-row][data-col="${day}"]`).nth(0).click();
+  await page.getByRole("checkbox").uncheck();
+  await page.getByRole("option", { name: /Desayunos/ }).click();
+  await expect(page.locator(`[data-row][data-col="${day}"]`).nth(0)).toHaveText("DZ");
+  // still there a few seconds later (the background re-plan of the month leaves the hotel's own shift alone)
+  await page.waitForTimeout(2500);
+  await expect(page.locator(`[data-row][data-col="${day}"]`).nth(0)).toHaveText("DZ");
+});
+
+test("turnos y puestos: un puesto propio aparece como sección del equipo", async ({ page }) => {
+  await page.goto("/turnos");
+  await page.waitForSelector("main");
+  await page.getByRole("button", { name: "Añadir puesto" }).click();
+  await page.getByLabel("Nombre del puesto p-1").fill("Conserjes");
+  await expect(page.getByRole("status")).toHaveText("Guardado", { timeout: 5000 });
+  await page.goto("/equipo");
+  await page.waitForSelector("main");
+  await expect(page.getByRole("region", { name: "Conserjes" })).toBeVisible();
+});

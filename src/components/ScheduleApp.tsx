@@ -33,7 +33,7 @@ import { useRemoteSchedule } from "@/lib/useRemoteSchedule";
 import { AccountChip } from "./AccountChip";
 import { useRouter } from "next/navigation";
 import { ExportMenu } from "./ExportMenu";
-import { ChevronLeft, ChevronRight, CheckIcon, ClockIcon, DownloadIcon, InboxIcon, LockIcon, LogoMark, MoreIcon, PrinterIcon, TableIcon, RedoIcon, SparklesIcon, UndoIcon, UsersIcon, HelpIcon } from "./icons";
+import { ChevronLeft, ChevronRight, CheckIcon, ClockIcon, DownloadIcon, InboxIcon, LockIcon, LogoMark, MoreIcon, PrinterIcon, TableIcon, RedoIcon, SparklesIcon, UndoIcon, UsersIcon, HelpIcon, PaletteIcon } from "./icons";
 import { ActionSheet, type SheetAction } from "./ActionSheet";
 import { AppNav } from "./AppNav";
 import { MobileTabBar } from "./MobileTabBar";
@@ -514,6 +514,7 @@ export function ScheduleApp() {
     ...(w || remoteReadOnly ? [] : [{ label: "Restaurar copia de seguridad", icon: <DownloadIcon />, onClick: () => restoreInput.current?.click() }]),
     ...(!w && remote.draft ? [{ label: "Publicar mes", icon: <DownloadIcon />, onClick: () => void remote.publish() }] : []),
     ...(remoteConfigured ? [{ label: auth.email ? `Mi cuenta (${auth.email})` : "Entrar", icon: <UsersIcon />, onClick: () => router.push(auth.email ? "/cuenta" : "/entrar") }] : []),
+    ...(w ? [] : [{ label: "Turnos y puestos", hint: "Nombres, letras y colores", icon: <PaletteIcon />, onClick: () => router.push("/turnos") }]),
     { label: "Ayuda (manual de una hoja)", icon: <HelpIcon />, onClick: () => router.push("/ayuda") },
     ...(w ? [] : [{ label: "Historial de cambios", icon: <ClockIcon />, onClick: () => setHistoryOpen(true) }]),
     ...(w ? [] : [{ label: "Generar automático", hint: "Rehace el calendario del mes", icon: <SparklesIcon />, onClick: () => setConfirmRegenerate(true), disabled: readOnly, tone: "accent" as const }]),
