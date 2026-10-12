@@ -1,5 +1,6 @@
 "use client";
 
+import { flushSync } from "react-dom";
 import dynamic from "next/dynamic";
 import { REQUIRED_SCHEMA, useSchemaOutdated } from "@/lib/schemaCheck";
 import { MobileViewBar } from "./MobileViewBar";
@@ -24,7 +25,8 @@ import { SHIFTS, displayCode } from "@/lib/domain/types";
 import { planAbsence, planDayOff, planFix, planShiftPref, planShiftSwap, type Plan, type RepairContext } from "@/lib/domain/repair";
 import { decide, KIND_LABEL, planForRequest, requestMonth, type ShiftRequest } from "@/lib/domain/requests";
 import { readRequests, writeRequests } from "@/lib/requestsStore";
-import { downloadText } from "@/lib/download";
+import { downloadBlob, downloadText } from "@/lib/download";
+import { buildMonthReport } from "@/lib/domain/report";
 import { backupName, createBackup, describeBackup, parseBackup, restoreBackup, type Backup } from "@/lib/backup";
 import { toCSV, toICS } from "@/lib/export";
 import { remoteConfigured } from "@/lib/supabase";
@@ -479,6 +481,12 @@ export function ScheduleApp() {
     writeLocks(ym.year, ym.month, {});
   };
 
+  // Printing from the browser's own menu (not our button) also prints the whole month, never just the week on screen.
+  useEffect(() => {
+    const before = () => flushSync(() => setView("month"));
+    window.addEventListener("beforeprint", before);
+    return () => window.removeEventListener("beforeprint", before);
+  }, []);
   const printMonth = () => {
     setView("month"); // a printout always shows the whole month
     setTimeout(() => window.print(), 150);
@@ -501,6 +509,32 @@ export function ScheduleApp() {
   };
   const exportCSV = () =>
     downloadText(`${fileBase}.csv`, toCSV(h.present, visible, ym.year, ym.month), "text/csv");
+  // Real files built on this device (the libraries load only when asked for), the same from a phone, a computer or the installed app.
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const report = () => buildMonthReport(h.present, visible, ym.year, ym.month, { holidays: localHolidaysOf(rules, ym.year) });
+  const build = async (name: string, make: () => Promise<Blob>) => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      downloadBlob(name, await make());
+    } catch (e) {
+      setExportError(`No se ha podido preparar el archivo (${(e as Error).message}). Prueba otra vez.`);
+    } finally {
+      setExporting(false);
+    }
+  };
+  const exportXlsx = () =>
+    build(`${fileBase}.xlsx`, async () => {
+      const { monthWorkbook } = await import("@/lib/exportXlsx");
+      return new Blob([await monthWorkbook(report())], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    });
+  const exportMonthPdf = () =>
+    build(`${fileBase}.pdf`, async () => (await import("@/lib/exportPdf")).monthPdf(report()));
+  const mine = auth.isWorker ? visible.find((p) => p.id === auth.staffId) : undefined;
+  const exportPeoplePdf = () =>
+    build(mine ? `${fileBase}-${mine.id}.pdf` : `${fileBase}-por-persona.pdf`, async () => (await import("@/lib/exportPdf")).peoplePdf(report(), mine ? [mine.id] : visible.map((p) => p.id)));
+  const peopleLabel = auth.isWorker ? "Mi horario en PDF" : "PDF por persona";
   const exportICS = (person: Staff) =>
     downloadText(`${fileBase}-${person.id}.ics`, toICS(h.present, person, ym.year, ym.month), "text/calendar");
 
@@ -508,8 +542,10 @@ export function ScheduleApp() {
   const sheetActions: SheetAction[] = [
     ...(w ? [] : [{ label: "Deshacer", icon: <UndoIcon />, onClick: () => dispatch({ type: "undo" }), disabled: readOnly || !h.past.length }]),
     ...(w ? [] : [{ label: "Rehacer", icon: <RedoIcon />, onClick: () => dispatch({ type: "redo" }), disabled: readOnly || !h.future.length }]),
-    { label: "Exportar PDF / imprimir", hint: "Una página A4 apaisada con todo el mes", icon: <PrinterIcon />, onClick: printMonth },
-    { label: "Exportar CSV (Excel)", icon: <TableIcon />, onClick: exportCSV },
+    { label: "PDF del mes", hint: "Todo el mes en una hoja A4", icon: <PrinterIcon />, onClick: () => void exportMonthPdf() },
+    ...(auth.isWorker && !mine ? [] : [{ label: peopleLabel, hint: auth.isWorker ? "Tu mes en calendario" : "Una hoja por persona", icon: <UsersIcon />, onClick: () => void exportPeoplePdf() }]),
+    { label: "Excel (.xlsx)", hint: "Con colores, totales y resumen", icon: <TableIcon />, onClick: () => void exportXlsx() },
+    { label: "Imprimir", icon: <PrinterIcon />, onClick: printMonth },
     ...(w ? [] : [{ label: "Guardar copia de seguridad", hint: "Descarga todo: equipo, meses, solicitudes y bloqueos", icon: <DownloadIcon />, onClick: saveBackup }]),
     ...(w || remoteReadOnly ? [] : [{ label: "Restaurar copia de seguridad", icon: <DownloadIcon />, onClick: () => restoreInput.current?.click() }]),
     ...(!w && remote.draft ? [{ label: "Publicar mes", icon: <DownloadIcon />, onClick: () => void remote.publish() }] : []),
@@ -605,7 +641,7 @@ export function ScheduleApp() {
               <InboxIcon />
               {badge > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-[11px] font-bold text-white shadow">{badge}</span>}
             </button>
-            <ExportMenu onPdf={printMonth} onCsv={exportCSV} onBackup={saveBackup} onRestore={remoteReadOnly ? undefined : () => restoreInput.current?.click()} />
+            <ExportMenu onMonthPdf={() => void exportMonthPdf()} onPeoplePdf={() => void exportPeoplePdf()} peopleLabel={peopleLabel} onXlsx={() => void exportXlsx()} onPrint={printMonth} onCsv={exportCSV} onBackup={auth.isWorker ? undefined : saveBackup} onRestore={remoteReadOnly ? undefined : () => restoreInput.current?.click()} busy={exporting} />
             {!auth.isWorker && <button
               disabled={readOnly}
               onClick={() => setConfirmRegenerate(true)}
@@ -636,6 +672,13 @@ export function ScheduleApp() {
             </li>
           ))}
         </ul>
+
+        {exportError && (
+          <p role="alert" className="glass anim-fade-up flex flex-wrap items-center gap-x-3 rounded-xl px-3 py-2 text-sm font-semibold text-red-600 print:hidden">
+            <span className="min-w-0 flex-1">{exportError}</span>
+            <button onClick={() => setExportError(null)} className="font-semibold text-brand underline-offset-2 hover:underline">Cerrar</button>
+          </p>
+        )}
 
         {schemaOutdated && (
           <p role="alert" className="glass anim-fade-up rounded-xl px-3 py-2 text-sm font-semibold text-red-600 print:hidden">

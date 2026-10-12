@@ -39,16 +39,16 @@ export interface ShiftDef {
 
 /** Live table of shifts: starts as the defaults and is rewritten by `applyCatalog` with the hotel's names, hours and colours. */
 const SHIFT_TABLE: Record<string, ShiftDef> = {
-  M: { code: "M", label: "Mañana", start: "07:00", end: "15:00" },
-  T: { code: "T", label: "Tarde", start: "15:00", end: "23:00" },
-  N: { code: "N", label: "Noche", start: "23:00", end: "07:00" },
-  S: { code: "S", label: "Supervisión", start: "09:15", end: "17:15" },
-  P: { code: "P", label: "Partido", start: "09:15", end: "17:15" },
-  MZ: { code: "MZ", label: "Mozo", start: "11:00", end: "19:00" },
-  D: { code: "D", label: "Libre", start: "", end: "" },
-  V: { code: "V", label: "Vacaciones", start: "", end: "" },
-  A: { code: "A", label: "Ausencia / baja", start: "", end: "" },
-  B: { code: "B", label: "Fuera de plantilla", start: "", end: "" },
+  M: { code: "M", label: "Mañana", start: "07:00", end: "15:00", color: "#ffff00" },
+  T: { code: "T", label: "Tarde", start: "15:00", end: "23:00", color: "#bdd7ee" },
+  N: { code: "N", label: "Noche", start: "23:00", end: "07:00", color: "#0070c0" },
+  S: { code: "S", label: "Supervisión", start: "09:15", end: "17:15", color: "#4472c4" },
+  P: { code: "P", label: "Partido", start: "09:15", end: "17:15", color: "#ffc000" },
+  MZ: { code: "MZ", label: "Mozo", start: "11:00", end: "19:00", color: "#00b0f0" },
+  D: { code: "D", label: "Libre", start: "", end: "", color: "#92d050" },
+  V: { code: "V", label: "Vacaciones", start: "", end: "", color: "#ff0000" },
+  A: { code: "A", label: "Ausencia / baja", start: "", end: "", color: "#7030a0" },
+  B: { code: "B", label: "Fuera de plantilla", start: "", end: "", color: "#000000" },
 };
 
 /**
