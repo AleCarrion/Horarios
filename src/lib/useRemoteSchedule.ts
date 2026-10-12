@@ -41,6 +41,12 @@ export function useRemoteSchedule({ year, month, present, auth, onLoaded, onRemo
   const [pending, setPending] = useState(() => (typeof window === "undefined" ? 0 : readQueue().length));
   const [loaded, setLoaded] = useState("");
   const [conflicts, setConflicts] = useState(0);
+  // bumped to load the month again (a reader waiting for the boss to publish)
+  const [tick, setTick] = useState(0);
+  const waiting = useRef(false);
+  useEffect(() => {
+    waiting.current = unpublished;
+  });
   const key = `${year}-${month}`;
   const base = useRef<Schedule>({});
   const presentRef = useRef(present);
@@ -134,6 +140,7 @@ export function useRemoteSchedule({ year, month, present, auth, onLoaded, onRemo
       .on("postgres_changes", { event: "*", schema: "public", table: "monthly_schedule" }, (p) => {
         const row = p.new as Row | undefined;
         if (!row?.day || row.day < first || row.day > last) return;
+        if (waiting.current) return setTick((t) => t + 1); // the month just got published: load it whole
         if (base.current[row.staff_id]?.[row.day] === row.shift_code) return;
         base.current = { ...base.current, [row.staff_id]: { ...base.current[row.staff_id], [row.day]: row.shift_code } };
         cb.current.onRemoteCell(row);
@@ -143,7 +150,22 @@ export function useRemoteSchedule({ year, month, present, auth, onLoaded, onRemo
       alive = false;
       void sb.removeChannel(channel);
     };
-  }, [sb, year, month, key, auth.ready, canEdit]);
+  }, [sb, year, month, key, auth.ready, canEdit, tick]);
+
+  // A reader who opened the app before the month was published checks again from time to time and when coming back to the app.
+  useEffect(() => {
+    if (!sb || !unpublished) return;
+    const again = () => setTick((t) => t + 1);
+    const t = setInterval(again, 20000);
+    const vis = () => document.visibilityState === "visible" && again();
+    document.addEventListener("visibilitychange", vis);
+    window.addEventListener("online", again);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", vis);
+      window.removeEventListener("online", again);
+    };
+  }, [sb, unpublished]);
 
   // Local edits (including undo/redo/regenerate) -> queue -> Supabase.
   useEffect(() => {
