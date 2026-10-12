@@ -141,3 +141,119 @@ Principio acordado: **la app permanece abierta** (sin pantalla de acceso para ve
 Decisiones que necesito de ti antes de empezar la Fase B: ciudad/comunidad para los festivos locales, si la dirección debe tener
 acceso propio, cuántos días de vacaciones anuales y jornada contratada tiene cada persona (para saldos y horas), y qué plazo de
 conservación de datos quieres para bajas y ausencias.
+
+---
+
+# Revisión crítica: ¿qué falta para salir al mercado?
+
+> Hecha el 12-oct-2026 recorriendo todas las pantallas en móvil y escritorio, probando el motor con otros equipos (3, 6, 9, 12 personas) y revisando base de datos, seguridad y legal. Lo marcado **(probado)** lo he reproducido; **(código)** lo he visto leyendo el código. Estado actual: la app es **excelente para un hotel concreto (Casa 1800)** y **no está lista para venderse a otros** por los puntos de abajo.
+
+## R1. Hallazgos
+
+### Bloqueantes para vender (🔴)
+1. **Es una app de un solo hotel** (código): el equipo por defecto, los nombres "Ana/Julio", los roles fijos (director, apoyo, recepción, noche, mozos), el nombre "Hotel Casa 1800" y el logo están escritos en el código. No existen "hoteles/cuentas": todos los datos de Supabase son de uno solo.
+2. **Cobertura fija de 1 persona por turno** (probado): con 3 auditores de noche o 2 recepcionistas por tarde, el validador marca *error de cobertura* los 30 días del mes (equipo grande: 36 avisos falsos; equipo con 2 noches: 21). El motor solo sabe cubrir "1 mañana, 1 tarde, 1 noche". Un hotel mediano ya no puede usarla.
+3. **Datos personales públicos** (código): la lectura es abierta a cualquiera con la dirección (decisión tomada para Casa 1800). Incluye nombres, bajas/ausencias y vacaciones → **RGPD**: para otros clientes es inaceptable. Además faltan política de privacidad, aviso legal, términos y gestión de derechos (acceso, borrado, exportación por persona).
+4. **Sin aislamiento entre clientes** (código): las políticas RLS no tienen `hotel_id`; con dos clientes verían los datos del otro.
+5. **Sin avisos reales** (código): las invitaciones son un enlace que la jefa copia y envía a mano; no hay correo de invitación ni notificaciones (mes publicado, petición resuelta, cambio de turno). Sin esto el trabajador no se entera de nada si no abre la app.
+6. **Sin cobro ni alta de clientes**: no hay registro de un hotel nuevo, prueba gratuita, planes, facturación ni baja.
+7. **Sin soporte ni operación** (código): no hay monitorización de errores, estado del servicio, copia de seguridad verificada ni entorno de pruebas separado (staging).
+
+### Importantes (🟡)
+8. **Reglas laborales incompletas** (código): se validan máximo de días seguidos, descanso entre turnos y festivos, pero **no** el descanso semanal mínimo (36 h/semana), las horas anuales/jornada contratada ni las vacaciones pactadas por convenio. Cada país/convenio distinto necesita su propio conjunto de reglas.
+9. **Un solo idioma y una sola zona horaria** (código): todo en español, formato de fecha del navegador, festivos solo de España y configurables a mano.
+10. **El motor es heurístico** (probado en equipos pequeños): con 3 recepcionistas + 1 noche genera 12 avisos de "días seguidos"; correcto avisando, pero no dice qué falta (contratar/relajar regla). Con equipos grandes crea rojos falsos (ver 2).
+11. **Importar el cuadrante actual** (Excel/CSV): un cliente nuevo no va a teclear a su plantilla y sus meses anteriores.
+12. **Cambios de turno entre compañeros, saldo de vacaciones y libres, horas extra**: el día a día real de cualquier hotel.
+13. **Seguridad de cuentas**: contraseña sin requisitos visibles, sin verificación en dos pasos, sin cierre de sesión en todos los dispositivos, sin registro de accesos (código).
+14. **Fallos de pulido detectados** (probado):
+    - `/invitacion` sin código (o con la app en modo local) se queda en un logo vacío: debería explicar "esta invitación no es válida".
+    - En móvil, el cartel de mes **borrador** estrecha el texto a una columna de 4 palabras y los botones quedan descolocados.
+    - El menú inferior flotante tapa filas del cuadrante al desplazarse en capturas largas y la pantalla de Equipo es muy larga (cada persona ocupa media pantalla): falta una vista compacta.
+    - Las fechas de alta/baja usan el formato del navegador (mm/dd/aaaa en inglés).
+15. **Rendimiento en móvil lento** (medido): Lighthouse móvil 86 (LCP ≈4 s en 4G lenta); el cuadrante se pinta tras hidratar. Objetivo ≥ 90.
+16. **Pruebas**: no hay pruebas automáticas contra un Supabase real con usuarios distintos (jefa/trabajador/anónimo) ni de dos dispositivos a la vez (el fallo de "no lo ven los demás" se escapó por eso).
+
+### Mejoras de calidad (🟢)
+17. Trocear `ScheduleApp.tsx` (sigue ~890 líneas), `README` para desarrolladores y guía de despliegue, accesibilidad con lector de pantalla real, modo "quiosco" para pantalla en recepción, exportar a PDF con la plantilla del hotel.
+
+## R2. Plan para salir al mercado (Fase E)
+
+Orden pensado para que cada paso se pueda usar y vender por sí solo.
+
+### E0 · Decisiones que necesito de ti (1 conversación)
+- ¿Venderás a **hoteles de tamaño parecido** (8–15 personas, recepción 24 h) o a todo tipo (hostales, aparthoteles, restauración)?
+- ¿Solo **España** (convenio de hostelería) al principio?
+- ¿**Modelo de precio** (por hotel/mes, por empleado) y quién da el soporte?
+- ¿Casa 1800 seguirá con lectura abierta o pasa al modelo estándar (todo con login)?
+
+### E1 · Multi-hotel y datos (🔴, la base de todo)
+| # | Tarea | Aceptación |
+|---|---|---|
+| E1.1 | Tabla `hotels` y `hotel_id` en todas las tablas + RLS por hotel; roles por hotel | Prueba SQL: un usuario del hotel A nunca lee ni escribe en el hotel B |
+| E1.2 | Registro de hotel nuevo (alta guiada: nombre, logo, color, equipo, turnos) y selector si una persona está en varios | Un hotel nuevo funciona sin tocar código |
+| E1.3 | Quitar todo lo de Casa 1800 del código (equipo, nombres, logo) → datos de configuración | `grep` sin nombres propios; Casa 1800 migrada como "hotel 1" sin perder nada |
+| E1.4 | Cerrar la lectura: solo personas con cuenta del hotel (opción de enlace de solo lectura revocable para la pantalla de recepción) | Anónimo no lee nada (prueba SQL) |
+| E1.5 | Migraciones versionadas con **staging** y copia previa; script de comprobación del esquema al arrancar (evita el fallo de `shifts` que tuvimos) | La app avisa claramente "falta migración X" |
+
+### E2 · Motor configurable (🔴)
+| # | Tarea | Aceptación |
+|---|---|---|
+| E2.1 | **Cobertura por turno configurable** (nº de personas por M/T/N y por día de la semana) en Reglas | Equipos de 3 noches o 2 tardes sin avisos falsos; tests con 6 plantillas distintas |
+| E2.2 | **Turnos y roles personalizables** (nombre, horas, color, quién puede hacerlos) en vez de los 10 fijos | Crear "Turno corto 10–14" y que el motor lo use |
+| E2.3 | Descanso semanal (36 h), jornada contratada y tope de horas por convenio; paquetes de reglas por país | Validador con convenio de hostelería de ejemplo |
+| E2.4 | Explicar la falta de personal: "con esta plantilla no se puede cubrir; faltan X horas" | Mensaje claro en equipos pequeños |
+| E2.5 | Generador en *Web Worker* y límite de tiempo | La pantalla nunca se bloquea con 30 personas |
+
+### E3 · Avisos y comunicación (🔴)
+| # | Tarea | Aceptación |
+|---|---|---|
+| E3.1 | Correo de invitación automático (Supabase Auth + proveedor SMTP propio, dominio verificado) | Invitar a alguien envía el correo; plantilla con marca del hotel |
+| E3.2 | Notificaciones dentro de la app y por correo: mes publicado, petición resuelta, cambio en tu turno | Preferencias por persona |
+| E3.3 | Notificaciones push en el móvil (PWA) opcionales | Llegan con la app cerrada |
+| E3.4 | Suscripción de calendario (iCal) por persona con enlace revocable | Aparece en Google/Apple Calendar |
+
+### E4 · Operación diaria (🟡)
+| # | Tarea |
+|---|---|
+| E4.1 | Cambios de turno entre compañeros con aprobación de la jefa |
+| E4.2 | Saldo de vacaciones y libres, calendario anual de vacaciones y solicitud con aprobación |
+| E4.3 | Importar equipo y cuadrantes desde Excel/CSV (con vista previa y errores por fila) |
+| E4.4 | Notas por día, "quién puede cubrir el día D", informes de horas y absentismo (CSV/PDF) |
+| E4.5 | Rol dirección (solo lectura + informes) |
+
+### E5 · Legal, seguridad y confianza (🔴 antes de cobrar)
+| # | Tarea |
+|---|---|
+| E5.1 | Política de privacidad, aviso legal, términos, cookies (la app solo usa almacenamiento técnico) y contrato de encargado de tratamiento (DPA) |
+| E5.2 | Derechos RGPD: exportar mis datos, borrar a una persona dada de baja, plazo de retención configurable |
+| E5.3 | Verificación en dos pasos opcional, requisitos de contraseña, "cerrar sesión en todos los dispositivos", registro de accesos |
+| E5.4 | Cabecera CSP, revisión de dependencias automática, prueba de penetración básica |
+| E5.5 | Copias de seguridad diarias de Supabase con prueba de restauración trimestral; plan de continuidad (qué pasa si Supabase/Vercel caen: el modo sin conexión ya aguanta lectura) |
+
+### E6 · Negocio (🟡)
+| # | Tarea |
+|---|---|
+| E6.1 | Web comercial / página de inicio con precios y demo con datos de ejemplo |
+| E6.2 | Alta de clientes y cobro (Stripe), planes, prueba gratuita, baja y exportación al cancelar |
+| E6.3 | Monitorización de errores (Sentry), estado del servicio, analítica sin datos personales |
+| E6.4 | Soporte: formulario "avísanos de un problema" dentro de la app (con versión y captura opcional), base de ayuda |
+| E6.5 | Multiidioma (ES/EN primero) y festivos por país/región automáticos |
+
+### E7 · Calidad (🟢/🟡, en paralelo)
+| # | Tarea |
+|---|---|
+| E7.1 | Pruebas de integración con Supabase real (jefa / trabajador / anónimo / dos dispositivos a la vez) en CI |
+| E7.2 | Arreglar los fallos de pulido del punto 14 y subir Lighthouse móvil a ≥ 90 |
+| E7.3 | Pruebas con usuarios reales (3 hoteles piloto) y medir: tiempo en hacer un mes, errores, satisfacción |
+| E7.4 | Trocear `ScheduleApp.tsx`, documentación para desarrolladores y guía de despliegue |
+
+## R3. Orden recomendado
+
+1. **Ya (esta semana, sin decisiones):** arreglar los fallos de pulido (14), verificación de migraciones al arrancar (E1.5), pruebas de integración con Supabase (E7.1).
+2. **Decidir E0**, después **E1 + E2.1/E2.2** (la app deja de ser de un solo hotel y el motor sirve a otros tamaños). Sin esto no hay producto.
+3. **E3 y E5** (correo, avisos y legal): sin ellos no se puede pedir dinero ni datos de trabajadores ajenos.
+4. **Piloto con 2–3 hoteles** (E7.3) usando E4 según lo que pidan.
+5. **E6** (cobro y web comercial) cuando el piloto funcione sin ayuda tuya.
+
+**Estimación orientativa:** E1+E2 ≈ 3–4 semanas de trabajo, E3+E5 ≈ 2–3, piloto 4 semanas, E6 ≈ 2. Un producto vendible a terceros, de aquí a unos 3 meses.
