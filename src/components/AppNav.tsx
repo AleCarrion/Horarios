@@ -30,7 +30,7 @@ export function AppNav() {
             href={href}
             aria-current={active ? "page" : undefined}
             className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-brand ${
-              active ? "bg-gradient-to-r from-brand to-brand-2 text-white shadow" : "text-muted hover:bg-brand/10 hover:text-foreground"
+              active ? "bg-gradient-to-r from-brand-solid to-brand-2-solid text-white shadow" : "text-muted hover:bg-brand/10 hover:text-foreground"
             }`}
           >
             <Icon width={15} height={15} />

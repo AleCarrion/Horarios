@@ -35,7 +35,7 @@ export function PwaStatus() {
         </div>
       )}
       {fresh && (
-        <div role="status" className="anim-fade-up flex flex-wrap items-center justify-center gap-3 bg-brand px-4 py-2 text-center text-sm font-semibold text-white print:hidden">
+        <div role="status" className="anim-fade-up flex flex-wrap items-center justify-center gap-3 bg-brand-solid px-4 py-2 text-center text-sm font-semibold text-white print:hidden">
           Hay una versión nueva de la aplicación.
           <button type="button" onClick={() => window.location.reload()} className="rounded-lg bg-white/20 px-3 py-1 transition hover:bg-white/30 active:scale-95">
             Actualizar

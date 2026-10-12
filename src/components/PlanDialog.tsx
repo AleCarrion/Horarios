@@ -85,7 +85,7 @@ export function PlanDialog({ plan, label, others = [], title, staff, onApply, on
                 <li key={t.text} className="flex flex-wrap items-center justify-between gap-2">
                   <span className="min-w-0 flex-1 basis-48">{t.text}</span>
                   {t.kind === "unlock" && onUnlock && (
-                    <button type="button" onClick={() => onUnlock(t.cells ?? [])} className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white shadow transition hover:brightness-110 active:scale-95">
+                    <button type="button" onClick={() => onUnlock(t.cells ?? [])} className="rounded-lg bg-brand-solid px-3 py-1.5 text-xs font-semibold text-white shadow transition hover:brightness-110 active:scale-95">
                       Desbloquear y recalcular
                     </button>
                   )}

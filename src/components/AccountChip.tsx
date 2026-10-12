@@ -8,7 +8,7 @@ import type { AuthState } from "@/lib/useAuth";
 export function AccountChip({ auth, status }: { auth: AuthState; status?: SyncStatus }) {
   if (!auth.email)
     return (
-      <Link href="/entrar" className="rounded-xl bg-brand px-3 py-1.5 text-sm font-semibold text-white shadow transition hover:brightness-110 active:scale-95">
+      <Link href="/entrar" className="rounded-xl bg-brand-solid px-3 py-1.5 text-sm font-semibold text-white shadow transition hover:brightness-110 active:scale-95">
         Entrar
       </Link>
     );

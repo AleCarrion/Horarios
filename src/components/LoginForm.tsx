@@ -93,7 +93,7 @@ export function LoginForm({ auth, initialMode = "login" }: { auth: AuthState; in
       {msg.text}
     </p>
   );
-  const primary = "w-full rounded-xl bg-gradient-to-r from-brand to-brand-2 px-4 py-3 text-base font-semibold text-white shadow transition hover:-translate-y-0.5 active:scale-[0.99] disabled:opacity-50";
+  const primary = "w-full rounded-xl bg-gradient-to-r from-brand-solid to-brand-2-solid px-4 py-3 text-base font-semibold text-white shadow transition hover:-translate-y-0.5 active:scale-[0.99] disabled:opacity-50";
 
   if (auth.recovery)
     return (

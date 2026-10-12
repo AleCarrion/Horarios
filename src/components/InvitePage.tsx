@@ -55,13 +55,13 @@ export function InvitePage() {
           <div className="glass space-y-3 rounded-3xl p-6 text-center">
             <h2 className="text-lg font-bold">Esta invitación ya no vale</h2>
             <p className="text-sm text-muted">Puede que ya se haya usado o que haya caducado. Pide a la jefa que te envíe una nueva.</p>
-            <Link href="/entrar" className="inline-block rounded-xl bg-brand px-4 py-2 font-semibold text-white shadow">Entrar con mi cuenta</Link>
+            <Link href="/entrar" className="inline-block rounded-xl bg-brand-solid px-4 py-2 font-semibold text-white shadow">Entrar con mi cuenta</Link>
           </div>
         ) : auth.email ? (
           <div className="glass space-y-3 rounded-3xl p-6 text-center">
             <h2 className="text-lg font-bold">Casi está</h2>
             <p className="text-sm text-muted">Estás dentro como {auth.email}, pero esta invitación no se ha podido usar (quizá ya la usaste, o esa cuenta ya tenía acceso).</p>
-            <Link href="/" className="inline-block rounded-xl bg-brand px-4 py-2 font-semibold text-white shadow">Ir al horario</Link>
+            <Link href="/" className="inline-block rounded-xl bg-brand-solid px-4 py-2 font-semibold text-white shadow">Ir al horario</Link>
           </div>
         ) : (
           <>

@@ -134,7 +134,7 @@ export function RulesPage() {
             <label className="flex items-center gap-2 pb-2 text-sm">
               <input type="checkbox" checked={yearly} onChange={(e) => setYearly(e.target.checked)} /> Se repite cada año
             </label>
-            <button type="button" onClick={addHoliday} disabled={!date} className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 px-4 font-semibold text-white shadow transition active:scale-95 disabled:opacity-40">
+            <button type="button" onClick={addHoliday} disabled={!date} className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-brand-solid to-brand-2-solid px-4 font-semibold text-white shadow transition active:scale-95 disabled:opacity-40">
               <PlusIcon width={16} height={16} /> Añadir
             </button>
           </div>

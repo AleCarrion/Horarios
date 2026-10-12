@@ -1,5 +1,7 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import { MobileViewBar } from "./MobileViewBar";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { generateSchedule } from "@/lib/domain/generator";
 import { applyEdits, applyRemote, createHistory, redo, undo, type Edit } from "@/lib/domain/history";
@@ -30,18 +32,13 @@ import { AccountChip } from "./AccountChip";
 import { useRouter } from "next/navigation";
 import { ExportMenu } from "./ExportMenu";
 import { ChevronLeft, ChevronRight, CheckIcon, ClockIcon, DownloadIcon, InboxIcon, LockIcon, LogoMark, MoreIcon, PrinterIcon, TableIcon, RedoIcon, SparklesIcon, UndoIcon, UsersIcon, HelpIcon } from "./icons";
-import { RequestsPanel } from "./RequestsPanel";
-import { MyRequestsPanel } from "./MyRequestsPanel";
 import { ActionSheet, type SheetAction } from "./ActionSheet";
 import { AppNav } from "./AppNav";
 import { MobileTabBar } from "./MobileTabBar";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { PlanDialog } from "./PlanDialog";
 import { MonthSummary } from "./MonthSummary";
-import { CompareMonths } from "./CompareMonths";
 import { planCopyPattern } from "@/lib/domain/pattern";
 import { suggestFor } from "@/lib/domain/suggest";
-import { HistoryPanel } from "./HistoryPanel";
 import { LinkData } from "./LinkData";
 import { appendEntry, diffCells, type LogEntry } from "@/lib/domain/changeLog";
 import { readLog, writeLog } from "@/lib/changeLogStore";
@@ -62,6 +59,12 @@ type Action =
   | { type: "replace"; schedule: Schedule }
   | { type: "undo" }
   | { type: "redo" };
+
+const RequestsPanel = dynamic(() => import("./RequestsPanel").then((m) => m.RequestsPanel));
+const MyRequestsPanel = dynamic(() => import("./MyRequestsPanel").then((m) => m.MyRequestsPanel));
+const PlanDialog = dynamic(() => import("./PlanDialog").then((m) => m.PlanDialog));
+const CompareMonths = dynamic(() => import("./CompareMonths").then((m) => m.CompareMonths));
+const HistoryPanel = dynamic(() => import("./HistoryPanel").then((m) => m.HistoryPanel));
 
 function reducer(h: ReturnType<typeof createHistory>, a: Action) {
   switch (a.type) {
@@ -662,31 +665,7 @@ export function ScheduleApp() {
           </p>
         )}
 
-        <div className="flex items-center gap-2 sm:hidden print:hidden">
-          <div role="group" aria-label="Vista del horario" className="flex rounded-2xl border border-line bg-card-solid/70 p-0.5 text-sm font-semibold">
-            {(["week", "month"] as const).map((v) => (
-              <button
-                key={v}
-                aria-pressed={view === v}
-                onClick={() => setView(v)}
-                className={`min-h-9 rounded-xl px-3.5 transition ${view === v ? "bg-brand text-white shadow" : "text-muted"}`}
-              >
-                {v === "week" ? "Semana" : "Mes"}
-              </button>
-            ))}
-          </div>
-          {view === "week" && (
-            <div className="ml-auto flex items-center gap-1 rounded-2xl border border-line bg-card-solid/70 p-0.5">
-              <button className="grid h-9 w-9 place-items-center rounded-xl active:bg-brand/10 disabled:opacity-30" onClick={() => goWeek(-1)} disabled={weekIdx === 0} aria-label="Semana anterior">
-                <ChevronLeft width={18} height={18} />
-              </button>
-              <span className="min-w-20 text-center text-sm font-bold" aria-live="polite">{weekLabel}</span>
-              <button className="grid h-9 w-9 place-items-center rounded-xl active:bg-brand/10 disabled:opacity-30" onClick={() => goWeek(1)} disabled={weekIdx >= weeks.length - 1} aria-label="Semana siguiente">
-                <ChevronRight width={18} height={18} />
-              </button>
-            </div>
-          )}
-        </div>
+        <MobileViewBar view={view} onView={setView} weekIdx={weekIdx} weekCount={weeks.length} weekLabel={weekLabel} onWeek={goWeek} />
 
         {remote.unpublished ? (
           <p className="glass rounded-2xl p-6 text-center font-medium">Este mes todavía no está publicado.</p>
@@ -740,7 +719,7 @@ export function ScheduleApp() {
                   <button
                     type="button"
                     onClick={() => fixIssues()}
-                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white shadow transition hover:brightness-110 active:scale-95"
+                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand-solid px-4 text-sm font-semibold text-white shadow transition hover:brightness-110 active:scale-95"
                   >
                     <SparklesIcon width={16} height={16} /> Arreglar avisos
                   </button>

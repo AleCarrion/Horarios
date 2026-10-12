@@ -141,7 +141,7 @@ export function AccessPage() {
                     </select>
                   </label>
                 )}
-                <button disabled={busy} className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 px-4 font-semibold text-white shadow transition active:scale-95 disabled:opacity-50">
+                <button disabled={busy} className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-brand-solid to-brand-2-solid px-4 font-semibold text-white shadow transition active:scale-95 disabled:opacity-50">
                   <PlusIcon width={16} height={16} /> Crear invitación
                 </button>
               </div>
@@ -158,7 +158,7 @@ export function AccessPage() {
                   <>
                     <input readOnly value={created.url} onFocus={(e) => e.currentTarget.select()} aria-label="Enlace de invitación" className="w-full rounded-lg border border-line bg-card-solid px-3 py-2 text-xs" />
                     <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => void copy(new URL(created.url!).searchParams.get("c") ?? "")} className="rounded-lg bg-brand px-3 py-1.5 font-semibold text-white shadow active:scale-95">
+                      <button type="button" onClick={() => void copy(new URL(created.url!).searchParams.get("c") ?? "")} className="rounded-lg bg-brand-solid px-3 py-1.5 font-semibold text-white shadow active:scale-95">
                         {copied === new URL(created.url).searchParams.get("c") ? "¡Copiado!" : "Copiar enlace"}
                       </button>
                       {typeof navigator !== "undefined" && "share" in navigator && (

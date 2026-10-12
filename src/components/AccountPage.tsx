@@ -79,12 +79,12 @@ export function AccountPage() {
         ) : !auth.email ? (
           <div className="glass space-y-3 rounded-2xl p-5 text-sm">
             <p>Estás viendo el horario sin haber entrado.</p>
-            <Link href="/entrar" className="inline-block rounded-xl bg-brand px-4 py-2 font-semibold text-white shadow">Entrar</Link>
+            <Link href="/entrar" className="inline-block rounded-xl bg-brand-solid px-4 py-2 font-semibold text-white shadow">Entrar</Link>
           </div>
         ) : (
           <>
             <section className="glass anim-fade-up flex items-center gap-4 rounded-3xl p-5">
-              <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand to-brand-2 text-2xl font-bold uppercase text-white shadow-lg shadow-brand/30">{auth.email[0]}</span>
+              <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-solid to-brand-2-solid text-2xl font-bold uppercase text-white shadow-lg shadow-brand/30">{auth.email[0]}</span>
               <div className="min-w-0">
                 <p className="truncate text-lg font-bold">{auth.email}</p>
                 <p className="font-semibold text-brand">{role}</p>
@@ -115,7 +115,7 @@ export function AccountPage() {
               <h3 className="font-semibold">Cambiar la contraseña</h3>
               <label className="sr-only" htmlFor="acc-pw">Contraseña nueva</label>
               <input id="acc-pw" type="password" autoComplete="new-password" required value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Contraseña nueva (8 o más, con letras y números)" className="w-full rounded-xl border border-line bg-card-solid px-3 py-2.5" />
-              <button className="rounded-xl bg-brand px-4 py-2 font-semibold text-white shadow transition active:scale-95">Guardar</button>
+              <button className="rounded-xl bg-brand-solid px-4 py-2 font-semibold text-white shadow transition active:scale-95">Guardar</button>
               {msg && <p role={msg.bad ? "alert" : "status"} className={`text-sm font-semibold ${msg.bad ? "text-red-600" : "text-emerald-600"}`}>{msg.text}</p>}
             </form>
 

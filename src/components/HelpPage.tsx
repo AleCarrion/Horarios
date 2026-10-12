@@ -15,7 +15,7 @@ const LEGEND: ShiftCode[] = ["M", "T", "N", "S", "P", "MZ", "D", "V", "A"];
 function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
   return (
     <li className="flex gap-3 break-inside-avoid print:gap-2">
-      <span aria-hidden="true" className="mt-0.5 grid h-7 w-7 shrink-0 print:h-5 print:w-5 print:text-[10px] place-items-center rounded-full bg-brand text-sm font-bold text-white print:border print:border-black print:bg-white print:text-black">{n}</span>
+      <span aria-hidden="true" className="mt-0.5 grid h-7 w-7 shrink-0 print:h-5 print:w-5 print:text-[10px] place-items-center rounded-full bg-brand-solid text-sm font-bold text-white print:border print:border-black print:bg-white print:text-black">{n}</span>
       <div className="min-w-0">
         <h3 className="font-semibold print:text-[13.5px]">{title}</h3>
         <div className="mt-0.5 text-sm leading-relaxed text-muted print:text-[12px] print:leading-snug print:text-black">{children}</div>
@@ -109,7 +109,7 @@ export function HelpPage() {
       type="button"
       aria-pressed={who === w}
       onClick={() => setWho(w)}
-      className={`min-h-10 rounded-xl px-4 text-sm font-semibold transition ${who === w ? "bg-brand text-white shadow" : "text-muted hover:bg-brand/10"}`}
+      className={`min-h-10 rounded-xl px-4 text-sm font-semibold transition ${who === w ? "bg-brand-solid text-white shadow" : "text-muted hover:bg-brand/10"}`}
     >
       {label}
     </button>

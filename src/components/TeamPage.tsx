@@ -392,7 +392,7 @@ export function TeamPage() {
                     type="button"
                     aria-pressed={form.role === x.role}
                     onClick={() => setForm({ ...form, role: x.role })}
-                    className={`rounded-full border px-3 py-1 text-sm font-medium transition ${form.role === x.role ? "border-transparent bg-brand text-white" : "border-line hover:bg-brand/10"}`}
+                    className={`rounded-full border px-3 py-1 text-sm font-medium transition ${form.role === x.role ? "border-transparent bg-brand-solid text-white" : "border-line hover:bg-brand/10"}`}
                   >
                     {x.label}
                   </button>

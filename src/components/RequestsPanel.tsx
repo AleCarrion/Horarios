@@ -100,7 +100,7 @@ export function RequestsPanel({ open, onClose, requests, staff, evaluate, onCrea
               key={t}
               onClick={() => setTab(t)}
               aria-pressed={tab === t}
-              className={`rounded-full px-3 py-1 text-sm font-semibold transition ${tab === t ? "bg-brand text-white" : "hover:bg-brand/10"}`}
+              className={`rounded-full px-3 py-1 text-sm font-semibold transition ${tab === t ? "bg-brand-solid text-white" : "hover:bg-brand/10"}`}
             >
               {t === "pending" ? `Pendientes (${pending.length})` : `Resueltas (${done.length})`}
             </button>
