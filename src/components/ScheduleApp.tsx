@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { generateSchedule } from "@/lib/domain/generator";
 import { applyEdits, applyRemote, createHistory, redo, undo, type Edit } from "@/lib/domain/history";
 import { DEFAULT_STAFF } from "@/lib/domain/roster";
@@ -38,6 +38,8 @@ import { MobileTabBar } from "./MobileTabBar";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { PlanDialog } from "./PlanDialog";
 import { MonthSummary } from "./MonthSummary";
+import { CompareMonths } from "./CompareMonths";
+import { planCopyPattern } from "@/lib/domain/pattern";
 import { suggestFor } from "@/lib/domain/suggest";
 import { HistoryPanel } from "./HistoryPanel";
 import { LinkData } from "./LinkData";
@@ -100,6 +102,7 @@ export function ScheduleApp() {
   };
   const [log, setLog] = useState<LogEntry[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
 
   const [today, setToday] = useState<string | null>(null);
   const [locks, setLocks] = useState<Locks>({});
@@ -330,6 +333,14 @@ export function ScheduleApp() {
       (l) => requestSwap(a, b, date, returnDate, l),
     );
   };
+  /** Lays last month's pattern (same weekday, four weeks earlier) over this month, repaired, as a preview. */
+  const copyPrevious = (lockedNow: Locks = locks) => {
+    if (!history) return;
+    const p = prevMonth(ym.year, ym.month);
+    const ctx: RepairContext = { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: lockedNow, rules };
+    present(`Copiar el patrón de ${MONTHS[p.m - 1].toLowerCase()}`, ctx, (c) => planCopyPattern(c, history), (l) => copyPrevious(l));
+  };
+  const loadMonth = useCallback((y: number, m: number) => scheduleForAsync(y, m, staff), [staff]);
   const fixIssues = (lockedNow: Locks = locks) => {
     const ctx: RepairContext = { year: ym.year, month: ym.month, staff, schedule: h.present, today: today ?? undefined, history, next: nextStored(ym.year, ym.month), locked: lockedNow, rules };
     present(`Arreglar avisos · ${MONTHS[ym.month - 1].toLowerCase()}`, ctx, planFix, (l) => fixIssues(l));
@@ -630,6 +641,10 @@ export function ScheduleApp() {
               {label === "reopened" && "Abierto para corregir algo. Vuelve a publicarlo cuando termines."}
               {label === "draft" && "Todavía lo estás preparando. Publícalo cuando esté listo."}
             </span>
+            {!readOnly && history && (
+              <button onClick={() => copyPrevious()} className="font-semibold text-brand underline-offset-2 hover:underline">Copiar el mes anterior</button>
+            )}
+            <button onClick={() => setCompareOpen(true)} className="font-semibold text-brand underline-offset-2 hover:underline">Comparar meses</button>
             {remoteReadOnly ? null : closed ? (
               <button onClick={() => setState({ state: "reopened", at: new Date().toISOString() })} className="font-semibold text-brand underline-offset-2 hover:underline">Reabrir para editar</button>
             ) : (
@@ -755,6 +770,7 @@ export function ScheduleApp() {
 
       </main>
       <MobileTabBar pending={badge} onRequests={() => setPanelOpen(true)} />
+      <CompareMonths open={compareOpen} onClose={() => setCompareOpen(false)} staff={visible} year={ym.year} month={ym.month} schedule={shown} load={loadMonth} />
       <LinkData auth={auth} />
       <HistoryPanel
         open={historyOpen}

@@ -178,6 +178,30 @@ test("sin Supabase no hay pantalla de entrada: /entrar vuelve al horario y /cuen
   await expect(page.getByText("modo local")).toBeVisible();
 });
 
+test("copiar el patrón del mes anterior: vista previa, aplicar y el mes sigue en regla", async ({ page, viewport }) => {
+  test.skip((viewport?.width ?? 1280) < 640, "la cuadrícula completa es de escritorio");
+  await open(page);
+  await page.getByRole("button", { name: "Copiar el mes anterior" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Copiar el patrón de");
+  await dialog.getByRole("button", { name: /Aplicar/ }).click();
+  await expect(page.locator("section[aria-live]")).toContainText("Todas las reglas y coberturas se cumplen");
+  await page.getByRole("button", { name: "Deshacer" }).first().click(); // one step back restores the previous month plan
+});
+
+test("comparar meses: tabla con lo que cambia de cada persona", async ({ page }) => {
+  await open(page);
+  await page.getByRole("button", { name: "Comparar meses" }).click();
+  const panel = page.getByRole("dialog", { name: "Comparar meses" });
+  const table = panel.getByRole("table");
+  await expect(table).toBeVisible();
+  await expect(table.getByRole("row")).toHaveCount(10);
+  await panel.getByLabel("Comparar con").selectOption({ index: 6 });
+  await expect(table).toBeVisible();
+  await panel.getByRole("button", { name: "Cerrar" }).click();
+  await expect(panel).toHaveCount(0);
+});
+
 test("la página de equipo lista la plantilla", async ({ page }) => {
   await page.goto("/equipo");
   await expect(page.getByRole("heading", { name: "Equipo" })).toBeVisible();
