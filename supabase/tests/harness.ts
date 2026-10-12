@@ -5,7 +5,7 @@ import { join } from "node:path";
 const root = join(__dirname, "..");
 
 /** What Supabase provides before our migrations run: the auth schema (auth.users, auth.uid(), auth.jwt()), the API roles and the realtime publication. */
-const SUPABASE_STUB = `
+export const SUPABASE_STUB = `
 create schema auth;
 create table auth.users (id uuid primary key, email text);
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
