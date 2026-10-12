@@ -10,7 +10,7 @@ estado de cada mes se comparten entre tus dispositivos (móvil y ordenador) y qu
 
 1. En <https://supabase.com> crea una cuenta y un proyecto nuevo (región: la UE más cercana, p. ej. *West EU (Ireland)*). Guarda la contraseña de la base de datos en tu gestor de contraseñas.
 2. **SQL editor → New query**, pega **todo** el contenido de `supabase/setup_all.sql` y pulsa *Run*. Debe terminar sin errores.
-   (Es la suma de las migraciones 0001–0009 y los datos iniciales. Si cambias una migración, regenera con `npm run db:bundle`.)
+   (Es la suma de las migraciones 0001–0010 y los datos iniciales. Si cambias una migración, regenera con `npm run db:bundle`.)
 3. **Authentication → URL configuration**: en *Site URL* pon la dirección de la app en Vercel y añade como *Redirect URL* esa misma dirección y `http://localhost:3000`.
 4. **Authentication → Sign In / Providers → Email**: déjalo activado (acceso con correo y contraseña). Para que crear cuenta sea inmediato, desactiva **Confirm email** (así no hace falta confirmar por correo; las personas invitadas ya las controlas tú desde *Accesos*). Si lo dejas activado, al crear la cuenta llega un correo con un enlace de confirmación. La opción de «entrar con enlace» y «he olvidado la contraseña» funcionan en ambos casos.
 5. **No desactives** *Allow new users to sign up*: las personas que invites necesitan poder entrar por primera vez. Quien entre sin estar invitado puede ver el horario (como cualquiera), pero no editar nada.
@@ -100,3 +100,9 @@ En *Authentication → Rate limits* puedes bajar el límite de correos por hora.
 | «No se ha podido subir (tabla: …)» | Falta una migración | Ejecuta las migraciones que falten (o `setup_all.sql` en un proyecto nuevo) |
 
 > Nota de despliegue: las variables `NEXT_PUBLIC_*` se leen al construir; tras cambiarlas en Vercel hay que desplegar de nuevo.
+
+## Todo con cuenta (migración 0010)
+
+Desde la migración `0010_login_required.sql` **nadie ve nada sin iniciar sesión** con un correo que el admin haya dado de alta (administradora, editora o trabajador). Quien entra con una cuenta sin permiso ve «Todavía no tienes acceso». Ya no existe «Solo quiero ver el horario».
+
+Orden para actualizar un proyecto que ya funciona: 1) espera a que Vercel termine de desplegar esta versión; 2) ejecuta `supabase/migrations/0010_login_required.sql` en el editor SQL. Si el admin ve un aviso rojo «a la base de datos le falta una actualización», es que falta ese paso.

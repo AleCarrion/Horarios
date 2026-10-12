@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { passwordProblem, friendlyAuthError } from "@/lib/loginGuard";
-import { setGuest } from "@/lib/session";
 import { remoteConfigured } from "@/lib/supabase";
 import { SYNC_DOT, SYNC_LABEL, type SyncStatus } from "@/lib/syncStatus";
 import { useAuth } from "@/lib/useAuth";
@@ -49,7 +48,6 @@ export function AccountPage() {
     }
   };
   const signOut = async () => {
-    setGuest(false);
     await auth.signOut();
     router.replace("/entrar");
   };

@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getInviteCode, isRecovery, setInviteCode, setRecovery, setStoredRole } from "./session";
+import { getInviteCode, getStoredRole, isRecovery, setInviteCode, setRecovery, setStoredRole } from "./session";
 import { getSupabase } from "./supabase";
+import { isMissingFunction } from "./sync";
 
 export interface AuthState {
   ready: boolean;
@@ -57,7 +58,13 @@ export function useAuth(): AuthState {
         }
         // The server decides what this e-mail may do: invited -> editor/admin; first person ever -> admin; otherwise nothing.
         const { data: access, error } = await sb.rpc("claim_access");
-        if (error) {
+        const stored = getStoredRole();
+        if (error && stored && !isMissingFunction(error)) {
+          // no connection right now: keep what this person could do the last time
+          setIsEditor(stored === "admin" || stored === "editor");
+          setIsAdmin(stored === "admin");
+          setIsWorker(stored === "worker");
+        } else if (error) {
           // server without migration 0007 yet: the old rule (a row in `editors`)
           const { data } = await sb.from("editors").select("user_id").eq("user_id", userId).maybeSingle();
           setIsEditor(Boolean(data));

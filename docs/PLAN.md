@@ -257,3 +257,11 @@ Orden pensado para que cada paso se pueda usar y vender por sí solo.
 5. **E6** (cobro y web comercial) cuando el piloto funcione sin ayuda tuya.
 
 **Estimación orientativa:** E1+E2 ≈ 3–4 semanas de trabajo, E3+E5 ≈ 2–3, piloto 4 semanas, E6 ≈ 2. Un producto vendible a terceros, de aquí a unos 3 meses.
+
+## R4. Decisiones tomadas y avance (12-oct-2026)
+
+- **Público objetivo:** todo tipo de alojamiento (por eso E2: cobertura y turnos configurables). **Solo España** al principio. **De momento no se vende** (E6.2 aparcado). **Todo con cuenta**: se acabó la lectura abierta.
+- ✅ **E1.4 hecho:** migración `0010_login_required.sql` (lectura solo para cuentas del hotel), pantalla «Todavía no tienes acceso», sin modo invitado, pruebas SQL (anónimo y cuenta sin permiso no ven nada).
+- ✅ **E1.5 (primera parte):** el admin ve un aviso rojo si a la base de datos le falta una migración (`schema_level()`); la 0010 también da de alta todos los turnos.
+- ✅ **Pulido (punto 14):** `/invitacion` sin código explica que no vale; el cartel del mes en móvil ya no se estrecha. (El formato mm/dd de las fechas era de mi navegador de pruebas en inglés, no un fallo de la app.)
+- ⏭ **Siguiente:** E2.1 (cobertura por turno configurable) y E2.2 (turnos y roles personalizables), luego E1.1–E1.3 (varios hoteles), E3 (correos) y E5 (legal).

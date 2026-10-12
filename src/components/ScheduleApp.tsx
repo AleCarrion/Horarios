@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { REQUIRED_SCHEMA, useSchemaOutdated } from "@/lib/schemaCheck";
 import { MobileViewBar } from "./MobileViewBar";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { generateSchedule } from "@/lib/domain/generator";
@@ -145,6 +146,7 @@ export function ScheduleApp() {
     onLoaded: (s) => dispatch({ type: "reset", schedule: s ?? load(ym.year, ym.month) }),
     onRemoteCell: (r) => dispatch({ type: "remote", staffId: r.staff_id, date: r.day, code: r.shift_code }),
   });
+  const schemaOutdated = useSchemaOutdated(remoteConfigured && auth.isAdmin);
   const remoteReadOnly = remoteConfigured && !remote.canEdit;
   // a published month, or one that is over, is not edited by accident: reopen it first
   const [monthState, setMonthState] = useState<MonthState | null>(null);
@@ -633,6 +635,12 @@ export function ScheduleApp() {
           ))}
         </ul>
 
+        {schemaOutdated && (
+          <p role="alert" className="glass anim-fade-up rounded-xl px-3 py-2 text-sm font-semibold text-red-600 print:hidden">
+            A la base de datos le falta una actualización (migración {REQUIRED_SCHEMA}). Ejecuta supabase/migrations/0010_login_required.sql en el editor SQL de Supabase; mira docs/SUPABASE.md.
+          </p>
+        )}
+
         {remote.publishError && (
           <p role="alert" className="glass anim-fade-up rounded-xl px-3 py-2 text-sm font-semibold text-red-600 print:hidden">
             No se ha podido publicar el mes para los demás: {remote.publishError}. Se reintenta solo.
@@ -653,7 +661,7 @@ export function ScheduleApp() {
             <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${closed ? "bg-amber-400/30 text-amber-900 dark:text-amber-200" : "bg-brand/10 text-brand"}`}>
               {{ draft: "Borrador", published: "Publicado", past: "Mes cerrado", reopened: "Reabierto" }[label]}
             </span>
-            <span className="min-w-0 flex-1 text-muted">
+            <span className="min-w-0 flex-1 basis-48 text-muted">
               {label === "published" && "Este mes está dado por bueno: no se edita ni se rehace por accidente."}
               {label === "past" && "Este mes ya ha pasado: está protegido para que no se cambie sin querer."}
               {label === "reopened" && "Abierto para corregir algo. Vuelve a publicarlo cuando termines."}

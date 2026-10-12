@@ -31,13 +31,16 @@ describe("migraciones desde cero", () => {
 });
 
 describe("lectura abierta (la app no se cierra)", () => {
-  it("cualquiera, sin sesión, puede ver plantilla, turnos y cuadrante", async () => {
+  it("sin sesión, o con sesión pero sin acceso al hotel, no se ve nada", async () => {
     await as(db, manager, async () => {
       await db.exec("insert into public.monthly_schedule (staff_id, day, shift_code) values ('marta', '2026-10-01', 'S')");
     });
-    const rows = await as(db, "anon", () => db.query<{ staff_id: string }>("select staff_id from public.monthly_schedule"));
-    expect(rows.rows).toHaveLength(1);
-    expect((await as(db, "anon", () => db.query("select 1 from public.staff"))).rows.length).toBeGreaterThan(0);
+    for (const table of ["monthly_schedule", "staff", "shifts", "schedule_months", "app_rules"]) {
+      expect((await as(db, "anon", () => db.query(`select 1 from public.${table}`))).rows, `anon ${table}`).toHaveLength(0);
+      expect((await as(db, worker, () => db.query(`select 1 from public.${table}`))).rows, `sin acceso ${table}`).toHaveLength(0);
+    }
+    expect((await as(db, manager, () => db.query("select 1 from public.monthly_schedule"))).rows).toHaveLength(1);
+    expect((await as(db, manager, () => db.query("select 1 from public.staff"))).rows.length).toBeGreaterThan(0);
   });
 });
 

@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { setGuest } from "@/lib/session";
 import { remoteConfigured } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
 import { Splash } from "./AuthGate";
@@ -33,18 +32,6 @@ export function LoginPage() {
         <div className="glass rounded-3xl p-5 sm:p-6">
           <LoginForm auth={auth} />
         </div>
-        <p className="text-center text-sm">
-          <button
-            type="button"
-            onClick={() => {
-              setGuest(true);
-              router.push("/");
-            }}
-            className="font-semibold text-muted underline-offset-2 hover:text-foreground hover:underline"
-          >
-            Solo quiero ver el horario
-          </button>
-        </p>
       </div>
     </main>
   );

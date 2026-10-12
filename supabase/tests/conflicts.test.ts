@@ -60,9 +60,10 @@ describe("guardar casillas sin pisar cambios más nuevos", () => {
 });
 
 describe("estado del mes y reglas compartidas", () => {
-  it("lectura abierta, escritura solo de la editora, y se anota quién y cuándo", async () => {
+  it("lectura solo con cuenta, escritura solo de la editora, y se anota quién y cuándo", async () => {
     await as(db, manager, () => db.exec("insert into public.schedule_months (year, month, status) values (2026, 11, 'published')"));
-    expect((await as(db, "anon", () => db.query("select status from public.schedule_months"))).rows).toEqual([{ status: "published" }]);
+    expect((await as(db, "anon", () => db.query("select status from public.schedule_months"))).rows).toEqual([]);
+    expect((await as(db, manager, () => db.query("select status from public.schedule_months"))).rows).toEqual([{ status: "published" }]);
     await as(db, worker, () => db.exec("update public.schedule_months set status = 'draft'"));
     expect((await db.query<{ status: string }>("select status from public.schedule_months")).rows[0].status).toBe("published");
     const who = await db.query<{ changed_by: string }>("select changed_by from public.schedule_months");
@@ -78,6 +79,7 @@ describe("estado del mes y reglas compartidas", () => {
       failed = true;
     }
     expect(failed).toBe(true);
-    expect((await as(db, "anon", () => db.query("select rules from public.app_rules"))).rows).toHaveLength(1);
+    expect((await as(db, "anon", () => db.query("select rules from public.app_rules"))).rows).toHaveLength(0);
+    expect((await as(db, manager, () => db.query("select rules from public.app_rules"))).rows).toHaveLength(1);
   });
 });

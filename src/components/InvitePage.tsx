@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getSupabase, remoteConfigured } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import { setInviteCode } from "@/lib/session";
 import { useAuth } from "@/lib/useAuth";
 import { Splash } from "./AuthGate";
@@ -34,7 +34,6 @@ export function InvitePage() {
     if (gotAccess) router.replace("/");
   }, [gotAccess, router]);
 
-  if (!remoteConfigured) return <Splash />;
   if (state === "loading" || gotAccess || !auth.ready) return <Splash />;
 
   const role = state !== "invalid" ? (state.info.role === "worker" ? "trabajador" : "editora") : "";
