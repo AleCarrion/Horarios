@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { cooldownLeft, friendlyAuthError, passwordProblem } from "@/lib/loginGuard";
-import { enabledProviders, PROVIDER_LABEL, type OAuthProvider } from "@/lib/oauth";
 import type { AuthState } from "@/lib/useAuth";
 
 export type Mode = "login" | "signup" | "reset" | "link";
@@ -107,15 +106,6 @@ export function LoginForm({ auth, initialMode = "login" }: { auth: AuthState; in
       </form>
     );
 
-  const providers = enabledProviders();
-  const social = async (p: OAuthProvider) => {
-    setMsg(null);
-    const err = await auth.signInOAuth(p);
-    if (err) fail(err);
-  };
-  const GoogleMark = () => (
-    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.2 5.5-4.7 7.2l7.6 5.9c4.4-4.1 6.9-10.1 6.9-17.6z"/><path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
-  );
   const title = { login: "Entrar", signup: "Crear cuenta", reset: "Recuperar la contraseña", link: "Entrar con un enlace" }[mode];
   const hint = {
     login: "Con tu correo y tu contraseña.",
@@ -151,17 +141,6 @@ export function LoginForm({ auth, initialMode = "login" }: { auth: AuthState; in
         {emailMode && wait > 0 ? `Espera ${wait} s` : { login: "Entrar", signup: "Crear cuenta", reset: "Enviar correo", link: "Enviar enlace" }[mode]}
       </button>
       {message}
-      {providers.length > 0 && (mode === "login" || mode === "signup") && (
-        <div className="space-y-2 pt-1">
-          <p className="flex items-center gap-3 text-xs text-muted before:h-px before:flex-1 before:bg-line after:h-px after:flex-1 after:bg-line">o</p>
-          {providers.map((p) => (
-            <button key={p} type="button" onClick={() => void social(p)} className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-card-solid px-4 py-3 text-base font-semibold transition hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99]">
-              <GoogleMark />
-              Continuar con {PROVIDER_LABEL[p]}
-            </button>
-          ))}
-        </div>
-      )}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 pt-1">
         {mode === "login" ? (
           <>

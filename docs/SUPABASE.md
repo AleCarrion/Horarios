@@ -38,18 +38,9 @@ La jefa las recibe en su bandeja de **Solicitudes** y las aprueba o rechaza como
 Hasta que la jefa **publique el mes**, los trabajadores ven «Este mes todavía no está publicado».
 Si ya tenías el proyecto montado, ejecuta `supabase/migrations/0008_workers.sql` en el SQL editor.
 
-## Entrar con Google
+## Entrar con Google (aparcado)
 
-La app trae el botón **Continuar con Google** en la pantalla de entrada y en la de invitación; se muestra solo si activas la variable `NEXT_PUBLIC_OAUTH_PROVIDERS` con el valor `google`. Los permisos no cambian: quien entra con Google se trata igual que con correo y contraseña (la administradora lo invita por correo o enlace; si entra con el mismo correo que usó en la invitación, queda vinculado).
-
-La dirección de retorno de Supabase es: `https://TU-PROYECTO.supabase.co/auth/v1/callback` (la tuya: `https://gacmwgfuwkxlxtdbsisz.supabase.co/auth/v1/callback`).
-
-### Google (gratis, ~10 minutos)
-1. Entra en <https://console.cloud.google.com> con una cuenta de Google y crea un proyecto (por ejemplo «Horarios Casa 1800»).
-2. **APIs y servicios → Pantalla de consentimiento de OAuth**: tipo *Externo*, nombre de la app, tu correo de contacto; en *Dominios autorizados* añade `supabase.co`; guarda. (En «Ámbitos» basta con los básicos: `email`, `profile`, `openid`.) Publícala en producción para que cualquiera pueda entrar (si la dejas en «Pruebas», solo entran los correos que añadas como usuarios de prueba).
-3. **Credenciales → Crear credenciales → ID de cliente de OAuth → Aplicación web**. En *URI de redirección autorizados* pega la dirección de retorno de Supabase de arriba. Crea y copia el **ID de cliente** y el **Secreto**.
-4. En Supabase: **Authentication → Sign In / Providers → Google** → activa, pega ID de cliente y Secreto, guarda.
-5. En Vercel añade `NEXT_PUBLIC_OAUTH_PROVIDERS` = `google` y vuelve a desplegar.
+Se probó y se quitó para simplificar: ahora se entra con correo y contraseña (o enlace por correo). Si algún día se retoma, recuerda que el **ID y el Secreto de cliente de Google van solo en Supabase** (Authentication → Providers → Google), nunca en Vercel ni en variables `NEXT_PUBLIC_*`, porque esas son públicas.
 
 ## 2. Conectar la app
 
