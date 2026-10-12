@@ -1,7 +1,7 @@
 import { generateOnce } from "./generator";
 import { diffDays, monthDates, toISO } from "./dates";
 import { allowedShifts } from "./rules";
-import { isActive, isOff, type Schedule, type ShiftCode, type Staff, type Warning } from "./types";
+import { isActive, isCustomShift, isFixedCell, isOff, type Schedule, type ShiftCode, type Staff, type Warning } from "./types";
 import { validateSchedule, type Issue } from "./validate";
 import type { Rules } from "./ruleset";
 
@@ -138,7 +138,7 @@ function freeze(ctx: RepairContext, staff: Staff[], from: string, to: string): R
       const code = ctx.schedule[s.id]?.[date];
       if (!code) continue;
       const inside = date >= from && date <= to && (!first || date >= first);
-      if (!inside || ctx.locked?.[s.id]?.[date]) (pinned[s.id] ??= {})[date] = code;
+      if (!inside || ctx.locked?.[s.id]?.[date] || isCustomShift(code)) (pinned[s.id] ??= {})[date] = code;
     }
   return pinned;
 }
@@ -417,7 +417,7 @@ export function planShiftSwap(ctx: RepairContext, a: string, b: string, date: st
     if (!ca || !cb) return none("Día no válido.");
     if (first && day < first) return none(`El día ${Number(day.slice(8))} está protegido (pasado o de los próximos ${ctx.protectedDays ?? 2} días); no se cambia solo.`);
     if (ctx.locked?.[a]?.[day] || ctx.locked?.[b]?.[day]) return none("Alguna de esas casillas está bloqueada.");
-    if (ca === "V" || cb === "V" || ca === "A" || cb === "A" || ca === "B" || cb === "B") return none("No se puede cambiar un día de vacaciones, ausencia o fuera de plantilla.");
+    if (isFixedCell(ca) || isFixedCell(cb)) return none("No se puede cambiar un día de vacaciones, ausencia o fuera de plantilla.");
     if (ca !== cb && (!allowedShifts(pa).includes(cb) || !allowedShifts(pb).includes(ca)))
       return none(`${pa.name} y ${pb.name} no pueden intercambiar esos turnos: su puesto no lo permite.`);
   }

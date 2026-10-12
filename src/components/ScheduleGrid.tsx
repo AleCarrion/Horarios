@@ -5,28 +5,14 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { isWeekend, monthDates, weekday } from "@/lib/domain/dates";
 import { isHoliday } from "@/lib/domain/holidays";
 import { allowedShifts } from "@/lib/domain/rules";
-import { SHIFTS, displayCode, type Schedule, type ShiftCode, type Staff } from "@/lib/domain/types";
+import { SHIFTS, displayCode, isPlanKind, type Schedule, type ShiftCode, type Staff } from "@/lib/domain/types";
 import type { Validation } from "@/lib/domain/validate";
-import { SHIFT_STYLE, WEEKDAYS } from "@/lib/ui";
-import { SECTIONS } from "@/lib/domain/team";
-import type { Role } from "@/lib/domain/types";
+import { WEEKDAYS } from "@/lib/ui";
+import { positionGradient, shiftPaint, textOn } from "@/lib/domain/catalog";
+import { SECTIONS, sectionIdOf, sectionOf } from "@/lib/domain/team";
 import { CalendarIcon, CheckIcon, GripIcon, LockIcon } from "./icons";
 
 const WEEKDAY_NAMES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
-const ROLE_LABEL: Record<Staff["role"], string> = {
-  night_auditor: "Auditor nocturno",
-  director: "Dirección",
-  senior: "Apoyo",
-  receptionist: "Recepción",
-  mozo: "Mozo",
-};
-const ROLE_COLOR: Record<Staff["role"], string> = {
-  night_auditor: "from-indigo-500 to-blue-700",
-  director: "from-sky-500 to-blue-600",
-  senior: "from-violet-500 to-fuchsia-600",
-  receptionist: "from-amber-400 to-orange-600",
-  mozo: "from-cyan-400 to-teal-600",
-};
 const initials = (name: string) =>
   name
     .split(/[\s.]+/)
@@ -45,7 +31,7 @@ interface Props {
   onEdit: (edits: { staffId: string; date: string; to: ShiftCode }[]) => void;
   onCalendar?: (staff: Staff) => void;
   /** Drag a person to reorder them or drop them in another section (changes their puesto). */
-  onMove?: (id: string, role: Role, beforeId: string | null) => void;
+  onMove?: (id: string, sectionId: string, beforeId: string | null) => void;
   /** Ask for a day off / holidays and re-plan the rest of the month around it (the app shows a preview first). */
   onPlan?: (staffId: string, date: string, kind: "D" | "V" | "A" | "M" | "T" | "N", days: number) => void;
   /** Exchange shifts with another person on this day (optionally exchanging again on `returnDate`). */
@@ -177,7 +163,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
   const dragId = useRef<string | null>(null);
   const clearDrop = () =>
     tableRef.current?.querySelectorAll(".drop-before,.drop-after,.drop-into").forEach((el) => el.classList.remove("drop-before", "drop-after", "drop-into"));
-  const membersOf = (role: Role) => staff.filter((x) => x.role === role && x.id !== dragId.current);
+  const membersOf = (section: string) => staff.filter((x) => sectionIdOf(x) === section && x.id !== dragId.current);
   const dropOnRow = (e: React.DragEvent, target: Staff, commit: boolean) => {
     if (!dragId.current || !onMove) return;
     e.preventDefault();
@@ -188,14 +174,14 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
       e.currentTarget.classList.add(after ? "drop-after" : "drop-before");
       return;
     }
-    const peers = membersOf(target.role);
+    const peers = membersOf(sectionIdOf(target));
     const i = peers.findIndex((x) => x.id === target.id);
     const before = target.id === dragId.current ? null : (peers[after ? i + 1 : i]?.id ?? null);
-    onMove(dragId.current, target.role, before);
+    onMove(dragId.current, sectionIdOf(target), before);
     clearDrop();
     dragId.current = null;
   };
-  const dropOnSection = (e: React.DragEvent, role: Role, commit: boolean) => {
+  const dropOnSection = (e: React.DragEvent, section: string, commit: boolean) => {
     if (!dragId.current || !onMove) return;
     e.preventDefault();
     if (!commit) {
@@ -203,7 +189,7 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
       e.currentTarget.classList.add("drop-into");
       return;
     }
-    onMove(dragId.current, role, membersOf(role)[0]?.id ?? null);
+    onMove(dragId.current, section, membersOf(section)[0]?.id ?? null);
     clearDrop();
     dragId.current = null;
   };
@@ -252,22 +238,22 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
             </tr>
           </thead>
           <tbody>
-            {SECTIONS.map(({ role, label }) => (
-              <Fragment key={role}>
+            {SECTIONS.map(({ id: sid, label }) => (
+              <Fragment key={sid}>
                 <tr>
                   <th
                     colSpan={cols.length + 1}
                     scope="colgroup"
-                    onDragOver={(e) => dropOnSection(e, role, false)}
+                    onDragOver={(e) => dropOnSection(e, sid, false)}
                     onDragLeave={clearDrop}
-                    onDrop={(e) => dropOnSection(e, role, true)}
+                    onDrop={(e) => dropOnSection(e, sid, true)}
                     className="sticky left-0 rounded-lg px-2 pb-0.5 pt-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-muted transition-colors [&.drop-into]:bg-accent/20"
                   >
                     {label}
-                    <span className="ml-2 font-medium normal-case tracking-normal opacity-70">{staff.filter((x) => x.role === role).length}</span>
+                    <span className="ml-2 font-medium normal-case tracking-normal opacity-70">{staff.filter((x) => sectionIdOf(x) === sid).length}</span>
                   </th>
                 </tr>
-                {staff.filter((x) => x.role === role).map((s) => (
+                {staff.filter((x) => sectionIdOf(x) === sid).map((s) => (
               <tr key={s.id} className="group">
                 <th
                   scope="row"
@@ -299,13 +285,14 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                     )}
                     <span
                       aria-hidden="true"
-                      className={`grid ${compact ? "h-7 w-7 text-[10px]" : "h-8 w-8 text-[11px]"} shrink-0 place-items-center rounded-full bg-gradient-to-br font-bold text-white shadow ${ROLE_COLOR[s.role]}`}
+                      style={{ backgroundImage: positionGradient(sectionOf(s).color), color: textOn(sectionOf(s).color) }}
+                      className={`grid ${compact ? "h-7 w-7 text-[10px]" : "h-8 w-8 text-[11px]"} shrink-0 place-items-center rounded-full font-bold shadow`}
                     >
                       {initials(s.name)}
                     </span>
                     <span className="min-w-0 flex-1 leading-tight">
                       <span className="block truncate text-[13px] font-semibold">{s.name}{s.id === mineId && <span className="ml-1.5 rounded-full bg-accent/20 px-1.5 py-px text-[10px] font-bold text-accent">tú</span>}</span>
-                      <span className="hidden truncate text-[11px] text-muted sm:block">{ROLE_LABEL[s.role]}</span>
+                      <span className="hidden truncate text-[11px] text-muted sm:block">{sectionOf(s).label}</span>
                     </span>
                     {onCalendar && !compact && (
                       <button
@@ -333,8 +320,9 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                         aria-haspopup="listbox"
                         aria-label={`${cellLabel(s, d, code)}${locked?.[s.id]?.[d] ? ", bloqueada" : ""}`}
                         onClick={(e) => openMenu(e, s.id, d)}
+                        style={code === "B" ? undefined : shiftPaint(code)}
                         className={`relative flex ${compact ? "h-12 w-full min-w-0 text-base" : "h-9 w-9"} items-center justify-center rounded-lg text-[13px] font-bold tracking-tight shadow-[inset_0_-2px_0_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.35)] transition-[transform,box-shadow] duration-150 enabled:cursor-pointer enabled:hover:z-10 enabled:hover:-translate-y-0.5 enabled:hover:scale-110 enabled:hover:shadow-lg enabled:active:scale-95 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
-                          code === "B" ? "bg-[repeating-linear-gradient(135deg,#0b0b0b_0_5px,#1f1f1f_5px_10px)]" : SHIFT_STYLE[code]
+                          code === "B" ? "bg-[repeating-linear-gradient(135deg,#0b0b0b_0_5px,#1f1f1f_5px_10px)]" : ""
                         } ${bad.has(`${s.id}|${d}`) ? "anim-alert ring-2 ring-red-600" : ""} ${preview?.has(`${s.id}|${d}`) ? "ring-[3px] ring-accent ring-offset-1 ring-offset-card-solid" : ""}`}
                       >
                         {displayCode(code)}
@@ -409,16 +397,15 @@ export function ScheduleGrid({ year, month, staff, schedule, validation, onEdit,
                     // Apply to `days` consecutive days from the clicked one (e.g. 14 days of vacation).
                     const start = dates.indexOf(menu.date);
                     const range = dates.slice(start, start + days);
-                    if (rebalance && onPlan && (c === "D" || c === "V" || c === "A" || c === "M" || c === "T" || c === "N")) onPlan(menu.staff.id, range[0], c, range.length);
+                    if (rebalance && onPlan && isPlanKind(c)) onPlan(menu.staff.id, range[0], c, range.length);
                     else onEdit(range.map((date) => ({ staffId: menu.staff.id, date, to: c })));
                     closeMenu();
                   }}
                   className="flex h-10 w-full items-center gap-2.5 rounded-xl px-2 text-left text-sm transition max-sm:h-12 hover:bg-brand/10 focus-visible:bg-brand/15 focus-visible:outline-2 focus-visible:outline-brand aria-selected:bg-brand/10 aria-selected:font-bold"
                 >
                   <span
-                    className={`flex h-7 w-9 items-center justify-center rounded-lg text-xs font-bold shadow-[inset_0_-2px_0_rgba(0,0,0,0.14)] ${
-                      c === "B" ? "bg-black" : SHIFT_STYLE[c]
-                    }`}
+                    style={shiftPaint(c)}
+                    className="flex h-7 w-9 items-center justify-center rounded-lg text-xs font-bold shadow-[inset_0_-2px_0_rgba(0,0,0,0.14)]"
                   >
                     {displayCode(c)}
                   </span>

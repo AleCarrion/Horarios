@@ -1,7 +1,7 @@
 import { monthDates } from "./dates";
 import { planFix, firstEditable, type Plan, type RepairContext, type CellChange } from "./repair";
 import { summarizeMonth, type PersonSummary } from "./summary";
-import { isActive, type Schedule, type ShiftCode, type Staff } from "./types";
+import { isActive, isFixedCell, type Schedule, type ShiftCode, type Staff } from "./types";
 
 const addDays = (iso: string, n: number) => {
   const [y, m, d] = iso.split("-").map(Number);
@@ -22,12 +22,12 @@ export function layPattern(ctx: RepairContext, previous: Schedule): Schedule {
     if (s.role !== "mozo") {
       for (const d of monthDates(ctx.year, ctx.month)) {
         const here = ctx.schedule[s.id]?.[d];
-        const fixed = here === "V" || here === "A" || here === "B" || ctx.locked?.[s.id]?.[d] || (first !== null && d < first) || !isActive(s, d);
+        const fixed = isFixedCell(here) || ctx.locked?.[s.id]?.[d] || (first !== null && d < first) || !isActive(s, d);
         if (fixed) continue;
         const was = previous[s.id]?.[addDays(d, -28)];
         if (!was) continue;
         // a holiday / absence last month is not a pattern: that day becomes a normal rest
-        row[d] = was === "V" || was === "A" || was === "B" ? "D" : was;
+        row[d] = isFixedCell(was) ? "D" : was;
       }
     }
     out[s.id] = row;

@@ -16,9 +16,10 @@ import { readRoster } from "@/lib/staffStore";
 import { useRemoteLocks } from "@/lib/useRemoteLocks";
 import { useRemoteRequests } from "@/lib/useRemoteRequests";
 import { diffSchedules } from "@/lib/sync";
-import { activeInMonth, isActive, type Role, type Schedule, type ShiftCode, type Staff } from "@/lib/domain/types";
+import { activeInMonth, isActive, isFixedCell, type Schedule, type ShiftCode, type Staff } from "@/lib/domain/types";
 import { validateSchedule } from "@/lib/domain/validate";
-import { MONTHS, SHIFT_STYLE } from "@/lib/ui";
+import { MONTHS } from "@/lib/ui";
+import { legendCodes, shiftPaint } from "@/lib/domain/catalog";
 import { SHIFTS, displayCode } from "@/lib/domain/types";
 import { planAbsence, planDayOff, planFix, planShiftPref, planShiftSwap, type Plan, type RepairContext } from "@/lib/domain/repair";
 import { decide, KIND_LABEL, planForRequest, requestMonth, type ShiftRequest } from "@/lib/domain/requests";
@@ -272,12 +273,12 @@ export function ScheduleApp() {
   const regenerate = (list: Staff[] = staff) => {
     try { localStorage.removeItem(storageKey(ym.year, ym.month)); clearScheduleCache(); } catch {}
     // Holidays (V), days out of the roster (B) and JC's rest days are inputs: edit them in the grid, then regenerate around them.
-    const unavailable: Record<string, Record<string, "V" | "A" | "B">> = {};
+    const unavailable: Record<string, Record<string, ShiftCode>> = {};
     for (const p of list) {
       const before = staff.find((x) => x.id === p.id); // dates as they were: a B outside them came from the old dates, not from a hand edit
       for (const [d, c] of Object.entries(h.present[p.id] ?? {})) {
         if (c === "B" && before && !isActive(before, d)) continue;
-        if (c === "V" || c === "A" || c === "B") (unavailable[p.id] ??= {})[d] = c;
+        if (isFixedCell(c)) (unavailable[p.id] ??= {})[d] = c;
       }
     }
     const night = list.find((p) => p.role === "night_auditor");
@@ -305,11 +306,11 @@ export function ScheduleApp() {
 
   // --- team: a drag in the grid that changes someone's puesto is planned over every affected month and previewed;
   // the rest of the team management (add, baja, dates, names) lives on the Equipo page.
-  const onMovePerson = (id: string, role: Role, beforeId: string | null) => {
-    const next = moveStaff(staff, id, role, beforeId);
+  const onMovePerson = (id: string, section: string, beforeId: string | null) => {
+    const next = moveStaff(staff, id, section, beforeId);
     if (next === staff || !today) return;
     const person = staff.find((x) => x.id === id);
-    if (person?.role === role) return team.saveTeam(next);
+    if (person?.role === next.find((x) => x.id === id)?.role) return team.saveTeam(next);
     setTeamProposal({ title: `${person?.name}: nuevo puesto`, next, plans: planTeamChange(staff, next, today) });
   };
   const applyTeamProposal = () => {
@@ -626,9 +627,9 @@ export function ScheduleApp() {
         </h2>
 
         <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 text-xs sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 print:hidden" aria-label="Leyenda">
-          {(["M", "T", "N", "S", "P", "MZ", "D", "V", "A"] as const).map((c) => (
+          {legendCodes().map((c) => (
             <li key={c} className="glass flex shrink-0 items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2.5 text-xs font-medium sm:gap-2 sm:py-1 sm:pl-1 sm:pr-3 transition hover:-translate-y-0.5 hover:shadow-md">
-              <span className={`grid h-6 w-7 place-items-center rounded-full text-[11px] font-bold ${SHIFT_STYLE[c]}`}>{displayCode(c)}</span>
+              <span style={shiftPaint(c)} className="grid h-6 w-7 place-items-center rounded-full text-[11px] font-bold">{displayCode(c)}</span>
               {SHIFTS[c].label}
               {SHIFTS[c].start && <span className="text-muted max-sm:hidden">{SHIFTS[c].start}–{SHIFTS[c].end}</span>}
             </li>
@@ -637,7 +638,7 @@ export function ScheduleApp() {
 
         {schemaOutdated && (
           <p role="alert" className="glass anim-fade-up rounded-xl px-3 py-2 text-sm font-semibold text-red-600 print:hidden">
-            A la base de datos le falta una actualización (migración {REQUIRED_SCHEMA}). Ejecuta supabase/migrations/0010_login_required.sql en el editor SQL de Supabase; mira docs/SUPABASE.md.
+            A la base de datos le falta una actualización (migración {REQUIRED_SCHEMA}). Ejecuta en el editor SQL de Supabase las migraciones que falten (la última es supabase/migrations/0011_catalog.sql); mira docs/SUPABASE.md.
           </p>
         )}
 

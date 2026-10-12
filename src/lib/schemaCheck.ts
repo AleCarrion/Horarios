@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { getSupabase } from "./supabase";
 
 /** The newest migration this version of the app needs (supabase/migrations). Raise it together with `schema_level()`. */
-export const REQUIRED_SCHEMA = 10;
+export const REQUIRED_SCHEMA = 11;
 
 /** Asks the database which migration it is at; returns true when it is older than the app needs (only the admin is told). */
 export function useSchemaOutdated(enabled: boolean): boolean {

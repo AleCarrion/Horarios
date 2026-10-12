@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { Level, Plan } from "@/lib/domain/repair";
 import { SHIFTS, displayCode, type Staff } from "@/lib/domain/types";
-import { SHIFT_STYLE } from "@/lib/ui";
+import { shiftPaint } from "@/lib/domain/catalog";
 import { AlertIcon, CheckIcon } from "./icons";
 
 const LEVEL: Record<Level, { title: string; tone: string }> = {
@@ -131,11 +131,11 @@ export function PlanDialog({ plan, label, others = [], title, staff, onApply, on
                         {list.map((c) => (
                           <span key={c.date} className="inline-flex items-center gap-1 rounded-lg bg-brand/5 px-1.5 py-1 text-xs">
                             <span className="font-semibold">{Number(c.date.slice(8))}</span>
-                            <span className={`grid h-5 w-5 place-items-center rounded text-[10px] font-bold opacity-70 ${c.from ? SHIFT_STYLE[c.from] : ""}`} title={c.from ? SHIFTS[c.from].label : ""}>
+                            <span style={c.from ? shiftPaint(c.from) : undefined} className="grid h-5 w-5 place-items-center rounded text-[10px] font-bold opacity-70" title={c.from ? SHIFTS[c.from].label : ""}>
                               {c.from ? displayCode(c.from) : "·"}
                             </span>
                             →
-                            <span className={`grid h-5 w-5 place-items-center rounded text-[10px] font-bold ${c.to === "B" ? "bg-black" : SHIFT_STYLE[c.to]}`} title={SHIFTS[c.to].label}>
+                            <span style={shiftPaint(c.to)} className="grid h-5 w-5 place-items-center rounded text-[10px] font-bold" title={SHIFTS[c.to].label}>
                               {displayCode(c.to)}
                             </span>
                           </span>

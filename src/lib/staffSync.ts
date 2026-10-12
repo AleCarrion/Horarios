@@ -13,6 +13,7 @@ export interface StaffRow {
   active_to: string | null;
   extra_shifts: string[] | null;
   max_covers: number | null;
+  position?: string | null;
 }
 
 /** Array position becomes sort_order. */
@@ -28,6 +29,7 @@ export function toStaffRows(staff: Staff[]): StaffRow[] {
     active_to: s.activeTo ?? null,
     extra_shifts: s.extraShifts ?? null,
     max_covers: s.maxCovers ?? null,
+    position: s.position ?? null,
   }));
 }
 
@@ -43,6 +45,7 @@ export function fromStaffRows(rows: StaffRow[]): Staff[] {
         if (r.active_to) s.activeTo = r.active_to;
         if (r.extra_shifts) s.extraShifts = r.extra_shifts as ShiftCode[];
         if (r.max_covers !== null && r.max_covers !== undefined) s.maxCovers = r.max_covers;
+        if (r.position) s.position = r.position;
         return s;
       }),
   );

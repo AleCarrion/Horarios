@@ -20,7 +20,7 @@ describe("repair_2026-10.sql", () => {
     const db = new PGlite();
     const { SUPABASE_STUB } = await import("./harness");
     await db.exec(SUPABASE_STUB);
-    for (const f of migrationFiles().filter((f) => !/^000[46]|^0010/.test(f))) await db.exec(readFileSync(join(root, "migrations", f), "utf8"));
+    for (const f of migrationFiles().filter((f) => !/^000[46]|^001[01]/.test(f))) await db.exec(readFileSync(join(root, "migrations", f), "utf8"));
     await db.exec(repair);
     await db.exec(`insert into public.schedule_months (year, month, status) values (2026, 10, 'published')`);
     await db.exec(`select public.apply_cells('[{"staff_id":"x","day":"2026-10-01","shift_code":"M","at":"2026-10-01T00:00:00Z"}]'::jsonb)`).catch(() => {});

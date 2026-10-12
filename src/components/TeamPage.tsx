@@ -3,7 +3,8 @@
 import { useMemo, useRef, useState } from "react";
 import { MONTHS } from "@/lib/ui";
 import { firstEditable } from "@/lib/domain/repair";
-import { addStaff, changeRole, moveStaff, SECTIONS, updateStaff } from "@/lib/domain/team";
+import { addStaff, changeRole, moveStaff, SECTIONS, sectionIdOf, sectionOf, updateStaff } from "@/lib/domain/team";
+import { positionGradient, textOn } from "@/lib/domain/catalog";
 import type { Role, Staff } from "@/lib/domain/types";
 import { applyTeamChange, planTeamChange, type MonthPlan } from "@/lib/teamPlanning";
 import { remoteConfigured } from "@/lib/supabase";
@@ -17,20 +18,6 @@ import { readRequests } from "@/lib/requestsStore";
 import { ArrowDown, ArrowUp, GripIcon, LogoMark, PlusIcon, UsersIcon } from "./icons";
 import { PlanDialog } from "./PlanDialog";
 
-const ROLE_COLOR: Record<Role, string> = {
-  night_auditor: "from-indigo-500 to-blue-700",
-  director: "from-sky-500 to-blue-600",
-  senior: "from-violet-500 to-fuchsia-600",
-  receptionist: "from-amber-400 to-orange-600",
-  mozo: "from-cyan-400 to-teal-600",
-};
-const ROLE_ACCENT: Record<Role, string> = {
-  night_auditor: "bg-indigo-500",
-  director: "bg-sky-500",
-  senior: "bg-violet-500",
-  receptionist: "bg-orange-500",
-  mozo: "bg-teal-500",
-};
 const ROLE_RULES: Record<Role, string> = {
   director: "Supervisión de lunes a viernes (9:15–17:15). Libra fines de semana y festivos. Nunca noches.",
   senior: "Partido (9:15–17:15). Descansa unos 10 días al mes y nunca coinciden los dos. Pueden cubrir mañanas (y tardes, quien tenga permiso).",
@@ -93,23 +80,23 @@ export function TeamPage() {
     setProposal(null);
   };
 
-  const move = (id: string, role: Role, beforeId: string | null) => {
-    const next = moveStaff(staff, id, role, beforeId);
+  const move = (id: string, section: string, beforeId: string | null) => {
+    const next = moveStaff(staff, id, section, beforeId);
     if (next === staff) return;
     const person = staff.find((p) => p.id === id)!;
-    if (person.role === role) saveTeam(next);
+    if (person.role === (SECTIONS.find((x) => x.id === section)?.role ?? person.role)) saveTeam(next);
     else propose(next, `${person.name}: nuevo puesto`);
   };
   const nudge = (id: string, dir: -1 | 1) => {
     const me = staff.find((p) => p.id === id)!;
-    const peers = staff.filter((p) => p.role === me.role);
+    const peers = staff.filter((p) => sectionIdOf(p) === sectionIdOf(me));
     const i = peers.findIndex((p) => p.id === id);
     const j = i + dir;
     if (j < 0 || j >= peers.length) return;
-    saveTeam(moveStaff(staff, id, me.role, dir === -1 ? peers[j].id : (peers[j + 1]?.id ?? null)));
+    saveTeam(moveStaff(staff, id, sectionIdOf(me), dir === -1 ? peers[j].id : (peers[j + 1]?.id ?? null)));
   };
 
-  const [form, setForm] = useState<{ name: string; role: Role; from: string }>({ name: "", role: "receptionist", from: "" });
+  const [form, setForm] = useState<{ name: string; role: string; from: string }>({ name: "", role: "receptionist", from: "" });
   const submitNew = (e: React.FormEvent) => {
     e.preventDefault();
     const next = addStaff(staff, { name: form.name, role: form.role });
@@ -120,7 +107,7 @@ export function TeamPage() {
     setForm({ name: "", role: form.role, from: "" });
   };
 
-  const counts = SECTIONS.map(({ role, label }) => ({ role, label, n: onRoster.filter((p) => p.role === role).length }));
+  const counts = SECTIONS.map(({ id, label, color }) => ({ id, label, color, n: onRoster.filter((p) => sectionIdOf(p) === id).length }));
   const dropRef = useRef<string | null>(null);
 
   const person = (p: Staff, i: number, list: Staff[]) => {
@@ -147,7 +134,7 @@ export function TeamPage() {
         onDrop={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          if (dragId) move(dragId, p.role, p.id);
+          if (dragId) move(dragId, sectionIdOf(p), p.id);
           setDragId(null);
           setOverId(null);
         }}
@@ -158,7 +145,7 @@ export function TeamPage() {
       >
         <div className="flex flex-wrap items-center gap-3">
           {!readOnly && <GripIcon width={16} height={16} className="cursor-grab text-muted opacity-40 transition group-hover:opacity-100 active:cursor-grabbing [@media(hover:none)]:hidden" aria-hidden="true" />}
-          <span aria-hidden="true" className={`grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-br text-sm font-bold text-white shadow ${ROLE_COLOR[p.role]}`}>
+          <span aria-hidden="true" style={{ backgroundImage: positionGradient(sectionOf(p).color), color: textOn(sectionOf(p).color) }} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold shadow">
             {initials(p.name)}
           </span>
           <div className="min-w-0 flex-1 basis-40">
@@ -179,13 +166,13 @@ export function TeamPage() {
           <div className="flex w-full items-center gap-2 sm:w-auto">
             <select
               aria-label={`Puesto de ${p.name}`}
-              value={p.role}
+              value={sectionIdOf(p)}
               disabled={readOnly}
-              onChange={(e) => propose(changeRole(staff, p.id, e.target.value as Role), `${p.name}: nuevo puesto`)}
+              onChange={(e) => propose(changeRole(staff, p.id, e.target.value), `${p.name}: nuevo puesto`)}
               className={`${field} max-sm:min-h-11 max-sm:flex-1`}
             >
               {SECTIONS.map((x) => (
-                <option key={x.role} value={x.role}>{x.label}</option>
+                <option key={x.id} value={x.id}>{x.label}</option>
               ))}
             </select>
             <div className="flex items-center gap-1">
@@ -224,12 +211,12 @@ export function TeamPage() {
 
   const rules = (
     <ul className="mt-3 space-y-3">
-      {SECTIONS.map(({ role, label }) => (
-        <li key={role} className="flex gap-2.5 text-xs">
-          <span className={`mt-0.5 h-4 w-1.5 shrink-0 rounded-full ${ROLE_ACCENT[role]}`} aria-hidden="true" />
+      {SECTIONS.map(({ id, role, label, color, custom }) => (
+        <li key={id} className="flex gap-2.5 text-xs">
+          <span style={{ backgroundColor: color }} className="mt-0.5 h-4 w-1.5 shrink-0 rounded-full" aria-hidden="true" />
           <span>
             <b className="text-sm">{label}</b>
-            <span className="mt-0.5 block text-muted">{ROLE_RULES[role]}</span>
+            <span className="mt-0.5 block text-muted">{custom ? `Se planifica como ${SECTIONS.find((x) => x.id === role)?.label ?? role}. ` : ""}{ROLE_RULES[role]}</span>
           </span>
         </li>
       ))}
@@ -284,8 +271,8 @@ export function TeamPage() {
             </div>
           </div>
           {counts.map((c, i) => (
-            <div key={c.role} className="glass anim-fade-up flex items-center gap-2.5 rounded-2xl p-2.5 sm:gap-3 sm:p-3" style={{ animationDelay: `${(i + 1) * 40}ms` }}>
-              <span className={`h-8 w-1.5 shrink-0 rounded-full sm:h-9 ${ROLE_ACCENT[c.role]}`} aria-hidden="true" />
+            <div key={c.id} className="glass anim-fade-up flex items-center gap-2.5 rounded-2xl p-2.5 sm:gap-3 sm:p-3" style={{ animationDelay: `${(i + 1) * 40}ms` }}>
+              <span style={{ backgroundColor: c.color }} className="h-8 w-1.5 shrink-0 rounded-full sm:h-9" aria-hidden="true" />
               <div>
                 <div className="text-[11px] text-muted sm:text-xs">{c.label}</div>
                 <div className="text-xl font-bold">{c.n}</div>
@@ -296,27 +283,27 @@ export function TeamPage() {
 
         <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
           <div className="space-y-5">
-            {SECTIONS.map(({ role, label }) => {
-              const members = onRoster.filter((p) => p.role === role);
+            {SECTIONS.map(({ id: sid, label, color }) => {
+              const members = onRoster.filter((p) => sectionIdOf(p) === sid);
               return (
                 <section
-                  key={role}
+                  key={sid}
                   aria-label={label}
                   onDragOver={(e) => {
                     if (!dragId) return;
                     e.preventDefault();
-                    dropRef.current = role;
+                    dropRef.current = sid;
                   }}
                   onDrop={(e) => {
                     e.preventDefault();
-                    if (dragId) move(dragId, role, null);
+                    if (dragId) move(dragId, sid, null);
                     setDragId(null);
                     setOverId(null);
                   }}
                   className={`glass rounded-3xl p-4 transition ${dragId ? "ring-2 ring-dashed ring-accent/40" : ""}`}
                 >
                   <div className="mb-3 flex items-center gap-2">
-                    <span className={`h-5 w-1.5 rounded-full ${ROLE_ACCENT[role]}`} aria-hidden="true" />
+                    <span style={{ backgroundColor: color }} className="h-5 w-1.5 rounded-full" aria-hidden="true" />
                     <h3 className="text-base font-bold">{label}</h3>
                     <span className="rounded-full bg-brand/10 px-2 py-0.5 text-xs font-semibold text-brand">{members.length}</span>
                   </div>
@@ -337,7 +324,7 @@ export function TeamPage() {
                 <ul className="mt-3 space-y-2 text-sm">
                   {gone.map((p) => (
                     <li key={p.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-line p-2.5">
-                      <span aria-hidden="true" className={`grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br text-xs font-bold text-white opacity-60 ${ROLE_COLOR[p.role]}`}>{initials(p.name)}</span>
+                      <span aria-hidden="true" style={{ backgroundImage: positionGradient(sectionOf(p).color), color: textOn(sectionOf(p).color) }} className="grid h-9 w-9 place-items-center rounded-full text-xs font-bold opacity-60">{initials(p.name)}</span>
                       <span className="font-semibold">{p.name}</span>
                       <span className="text-muted">
                         {p.activeFrom && p.activeFrom > now ? `Alta el ${p.activeFrom}` : p.activeTo ? `Baja desde el ${addDay(p.activeTo, 1)}` : ""}
@@ -398,7 +385,7 @@ export function TeamPage() {
                   </button>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-muted">{ROLE_RULES[form.role]}</p>
+              <p className="mt-2 text-xs text-muted">{ROLE_RULES[SECTIONS.find((x) => x.id === form.role)?.role ?? "receptionist"]}</p>
             </fieldset>
             <label className="block text-sm">
               <span className="text-xs text-muted">Empieza el</span>
@@ -407,7 +394,7 @@ export function TeamPage() {
             </label>
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setAdding(false)} className="rounded-xl border border-line px-4 py-2 text-sm font-semibold transition hover:bg-brand/10">Cancelar</button>
-              <button disabled={!form.name.trim()} className="rounded-xl bg-gradient-to-r from-brand to-brand-2 px-4 py-2 text-sm font-semibold text-white shadow transition hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-40">
+              <button disabled={!form.name.trim()} className="rounded-xl bg-gradient-to-r from-brand-solid to-brand-2-solid px-4 py-2 text-sm font-semibold text-white shadow transition hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-40">
                 Ver cambios
               </button>
             </div>

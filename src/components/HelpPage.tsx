@@ -2,15 +2,13 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { getStoredRole } from "@/lib/session";
-import { SHIFTS, displayCode, type ShiftCode } from "@/lib/domain/types";
-import { SHIFT_STYLE } from "@/lib/ui";
+import { SHIFTS, displayCode } from "@/lib/domain/types";
+import { legendCodes, shiftPaint } from "@/lib/domain/catalog";
 import { AppNav } from "./AppNav";
 import { LogoMark, PrinterIcon } from "./icons";
 import { MobileTabBar } from "./MobileTabBar";
 
 type Who = "jefa" | "trabajador";
-
-const LEGEND: ShiftCode[] = ["M", "T", "N", "S", "P", "MZ", "D", "V", "A"];
 
 function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
   return (
@@ -29,9 +27,9 @@ function Legend() {
     <section aria-label="Qué significan las letras" className="break-inside-avoid rounded-2xl border border-line p-4 print:p-2">
       <h3 className="font-semibold">Las letras del horario</h3>
       <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-3 print:grid-cols-3 print:gap-y-1 print:text-[11.5px]">
-        {LEGEND.map((c) => (
+        {legendCodes().map((c) => (
           <li key={c} className="flex items-center gap-2">
-            <span className={`grid h-6 w-7 shrink-0 place-items-center rounded-md text-xs font-bold ${SHIFT_STYLE[c]}`}>{displayCode(c)}</span>
+            <span style={shiftPaint(c)} className="grid h-6 w-7 shrink-0 place-items-center rounded-md text-xs font-bold">{displayCode(c)}</span>
             <span>{SHIFTS[c].label}{SHIFTS[c].start ? <span className="text-muted print:text-black"> {SHIFTS[c].start}–{SHIFTS[c].end}</span> : null}</span>
           </li>
         ))}

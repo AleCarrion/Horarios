@@ -1,21 +1,34 @@
 import { diffDays, toISO } from "./dates";
 import type { Role, Staff } from "./types";
 
-/** Sections of the grid, in the order of the hotel's sheet. */
-export const SECTIONS: { role: Role; label: string }[] = [
-  { role: "director", label: "Dirección" },
-  { role: "senior", label: "Apoyo / Partido" },
-  { role: "receptionist", label: "Recepción" },
-  { role: "night_auditor", label: "Noche" },
-  { role: "mozo", label: "Mozos" },
+export interface Section {
+  /** Built-in puestos use their role as id; the hotel's own are "p-1"… */
+  id: string;
+  /** The built-in puesto the planner treats it like. */
+  role: Role;
+  label: string;
+  color: string;
+  custom: boolean;
+}
+
+/** Sections of the grid, in the order of the hotel's sheet. The hotel can rename, recolour and add to them (see catalog.ts). */
+export const SECTIONS: Section[] = [
+  { id: "director", role: "director", label: "Dirección", color: "#0284c7", custom: false },
+  { id: "senior", role: "senior", label: "Apoyo / Partido", color: "#8b5cf6", custom: false },
+  { id: "receptionist", role: "receptionist", label: "Recepción", color: "#f97316", custom: false },
+  { id: "night_auditor", role: "night_auditor", label: "Noche", color: "#4f46e5", custom: false },
+  { id: "mozo", role: "mozo", label: "Mozos", color: "#0d9488", custom: false },
 ];
-const sectionIndex = (r: Role) => SECTIONS.findIndex((s) => s.role === r);
+/** The section a person sits in: their own puesto if it still exists, otherwise the built-in one. */
+export const sectionIdOf = (s: Pick<Staff, "role" | "position">) => (s.position && SECTIONS.some((x) => x.id === s.position) ? s.position : s.role);
+export const sectionOf = (s: Pick<Staff, "role" | "position">): Section => SECTIONS.find((x) => x.id === sectionIdOf(s))!;
+const sectionIndex = (id: string) => SECTIONS.findIndex((s) => s.id === id);
 
 /** Stable sort by section; people keep their relative order inside a section. */
 export function sortBySections(staff: Staff[]): Staff[] {
   return staff
     .map((s, i) => ({ s, i }))
-    .sort((a, b) => sectionIndex(a.s.role) - sectionIndex(b.s.role) || a.i - b.i)
+    .sort((a, b) => sectionIndex(sectionIdOf(a.s)) - sectionIndex(sectionIdOf(b.s)) || a.i - b.i)
     .map((x) => x.s);
 }
 
@@ -43,18 +56,24 @@ function withRole(person: Staff, role: Role, all: Staff[]): Staff {
   return next;
 }
 
-/** Moves `id` into `role`'s section, right before `beforeId` (or at the end when null). */
-export function moveStaff(staff: Staff[], id: string, role: Role, beforeId: string | null): Staff[] {
+/** Moves `id` into the section `sectionId`, right before `beforeId` (or at the end when null). */
+export function moveStaff(staff: Staff[], id: string, sectionId: string, beforeId: string | null): Staff[] {
   const person = staff.find((s) => s.id === id);
-  if (!person) return staff;
+  const sec = SECTIONS.find((x) => x.id === sectionId);
+  if (!person || !sec) return staff;
   const sorted = sortBySections(staff);
   const without = sorted.filter((s) => s.id !== id);
-  const moved = person.role === role ? person : withRole(person, role, staff);
+  let moved = person;
+  if (sectionIdOf(person) !== sec.id) {
+    moved = person.role === sec.role ? { ...person } : withRole(person, sec.role, staff);
+    if (sec.custom) moved.position = sec.id;
+    else delete moved.position;
+  }
   let at = beforeId ? without.findIndex((s) => s.id === beforeId) : -1;
   if (at === -1) {
-    // end of the section: after the last member of `role`, or at its slot between sections when empty
-    const last = without.map((s) => s.role).lastIndexOf(role);
-    at = last === -1 ? without.findIndex((s) => sectionIndex(s.role) > sectionIndex(role)) : last + 1;
+    // end of the section: after the last member of it, or at its slot between sections when empty
+    const last = without.map(sectionIdOf).lastIndexOf(sec.id);
+    at = last === -1 ? without.findIndex((s) => sectionIndex(sectionIdOf(s)) > sectionIndex(sec.id)) : last + 1;
     if (at === -1) at = without.length;
   }
   const result = [...without.slice(0, at), moved, ...without.slice(at)];
@@ -62,10 +81,10 @@ export function moveStaff(staff: Staff[], id: string, role: Role, beforeId: stri
 }
 
 /** Changes a person's puesto; they end up at the end of the new section. */
-export function changeRole(staff: Staff[], id: string, role: Role): Staff[] {
+export function changeRole(staff: Staff[], id: string, sectionId: string): Staff[] {
   const person = staff.find((s) => s.id === id);
-  if (!person || person.role === role) return staff;
-  return moveStaff(staff, id, role, null);
+  if (!person || sectionIdOf(person) === sectionId) return staff;
+  return moveStaff(staff, id, sectionId, null);
 }
 
 const slug = (name: string) =>
@@ -76,14 +95,16 @@ const slug = (name: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "") || "persona";
 
-export function addStaff(staff: Staff[], { name, role }: { name: string; role: Role }): Staff[] {
+export function addStaff(staff: Staff[], { name, role: sectionId }: { name: string; role: string }): Staff[] {
   const clean = name.trim();
   if (!clean) return staff;
   const base = slug(clean);
   let id = base;
   for (let n = 2; staff.some((s) => s.id === id); n++) id = `${base}-${n}`;
-  const person = withRole({ id, name: clean, role }, role, staff);
-  return moveStaff([...staff, person], id, role, null);
+  const sec = SECTIONS.find((x) => x.id === sectionId) ?? SECTIONS[0];
+  const person = withRole({ id, name: clean, role: sec.role }, sec.role, staff);
+  if (sec.custom) person.position = sec.id;
+  return moveStaff([...staff, person], id, sec.id, null);
 }
 
 export function updateStaff(staff: Staff[], id: string, patch: Partial<Staff>): Staff[] {

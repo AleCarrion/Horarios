@@ -1,7 +1,7 @@
 import { monthDates } from "./dates";
 import { allowedShifts } from "./rules";
 import { DEFAULT_RULES, type Rules } from "./ruleset";
-import { isActive, isOff, type Schedule, type ShiftCode, type Staff } from "./types";
+import { isActive, isCoverShift, isOff, type Schedule, type ShiftCode, type Staff } from "./types";
 
 export interface Coverage {
   M: number;
@@ -39,7 +39,7 @@ export function validateSchedule(schedule: Schedule, staff: Staff[], year: numbe
     const c = { M: 0, T: 0, N: 0, ok: true };
     for (const s of staff) {
       const code = schedule[s.id]?.[d];
-      if (code === "M" || code === "T" || code === "N") c[code]++;
+      if (isCoverShift(code)) c[code]++;
     }
     c.ok = c.M === 1 && c.T === 1 && c.N === 1;
     if (rules.onePartido && staff.filter((s) => schedule[s.id]?.[d] === "P").length > 1) issues.push({ kind: "coverage", date: d, message: `Hay más de una persona de partido el ${d}` });

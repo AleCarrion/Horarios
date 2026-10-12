@@ -2,7 +2,7 @@ import { holidaysOf } from "./holidays";
 import { DEFAULT_RULES, localHolidaysOf } from "./ruleset";
 import { validateSchedule } from "./validate";
 import { diffDays, isWeekend, monthDates, toISO } from "./dates";
-import { isActive, isOff, type GeneratorConfig, type GeneratorResult, type Schedule, type ShiftCode, type Staff, type Warning } from "./types";
+import { isActive, isCoverShift, isFixedCell, isOff, type GeneratorConfig, type GeneratorResult, type Schedule, type ShiftCode, type Staff, type Warning } from "./types";
 
 /** Extra "workload days" a covering senior counts as having, so receptionists are preferred but seniors still share M/T. */
 const SENIOR_PENALTY = 100;
@@ -116,11 +116,11 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
   };
   const pin = (id: string, d: string) => config.pinned?.[id]?.[d];
   /** "V" (holiday), "B" (not employed: outside alta/baja or marked by hand) or "D" (pinned libre); undefined when the person may work. */
-  const offCode = (id: string, d: string): "V" | "A" | "B" | "D" | undefined => {
+  const offCode = (id: string, d: string): ShiftCode | undefined => {
     const person = byId.get(id);
     if (person && !isActive(person, d)) return "B";
     const p = pin(id, d);
-    if (p === "V" || p === "A" || p === "B" || p === "D") return p;
+    if (p === "D" || isFixedCell(p)) return p;
     return config.unavailable?.[id]?.[d];
   };
   /** A pinned working shift (e.g. a frozen "T"), if any. */
@@ -227,7 +227,7 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
     // a pinned shift on a day that would not normally need it still has to be planned (e.g. a pinned night)
     for (const x of [...recs, ...seniors]) {
       const w = pinnedWork(x.id, d);
-      if ((w === "N" || w === "M" || w === "T") && !slots.includes(w)) slots.push(w);
+      if (isCoverShift(w) && !slots.includes(w)) slots.push(w);
     }
     const taken = new Set<string>();
     for (const slot of slots) {
@@ -353,7 +353,7 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
       s.dRun = code === "D" ? s.dRun + 1 : 0; // holidays (V/B) do not count towards the 3-day rest limit
       // Holidays and days before an alta count as "worked" for fairness, so nobody has to catch up after them
       // (a new hire or someone back from holiday does not absorb everyone else's shifts).
-      if (code === "V" || code === "A" || code === "B") s.worked++;
+      if (isFixedCell(code)) s.worked++;
       if (isOff(code)) {
         s.streak = 0;
         s.blockLen = 0;
@@ -384,7 +384,7 @@ export function generateOnce(config: GeneratorConfig): GeneratorResult {
     stats[s.id] = {
       worked: vals.filter((v) => !isOff(v)).length,
       rest: vals.filter((v) => v === "D").length,
-      off: vals.filter((v) => v === "V" || v === "A" || v === "B").length,
+      off: vals.filter((v) => isFixedCell(v)).length,
       M: vals.filter((v) => v === "M").length,
       T: vals.filter((v) => v === "T").length,
       N: vals.filter((v) => v === "N").length,

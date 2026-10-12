@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { CatalogProvider } from "@/components/CatalogProvider";
 import { PwaStatus } from "@/components/PwaStatus";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -30,7 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <PwaStatus />
-        {children}
+        <CatalogProvider>{children}</CatalogProvider>
       </body>
     </html>
   );

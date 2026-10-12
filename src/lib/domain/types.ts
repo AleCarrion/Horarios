@@ -1,6 +1,8 @@
 import type { Rules } from "./ruleset";
 /** V = vacaciones, B = fuera de plantilla (not employed that day). Both count as non-working. */
-export type ShiftCode = "M" | "T" | "N" | "S" | "P" | "MZ" | "D" | "V" | "A" | "B";
+export type BuiltinShift = "M" | "T" | "N" | "S" | "P" | "MZ" | "D" | "V" | "A" | "B";
+/** The ten shifts the engine knows, plus any shift the hotel creates itself (see catalog.ts): those are placed by hand only. */
+export type ShiftCode = BuiltinShift | (string & {});
 
 export type Role = "night_auditor" | "director" | "senior" | "receptionist" | "mozo";
 
@@ -8,6 +10,8 @@ export interface Staff {
   id: string;
   name: string;
   role: Role;
+  /** The hotel's own puesto (catalog id such as "p-1"); `role` is then the built-in puesto it behaves like. Absent = the built-in puesto. */
+  position?: string;
   /** Mozos: first day (YYYY-MM-DD) of any 5-work block; the 5-5 cycle is derived from it. */
   cycleAnchor?: string;
   /** First day (YYYY-MM-DD, inclusive) the person is on the roster; earlier days are "B" (fuera de plantilla). */
@@ -25,9 +29,16 @@ export interface ShiftDef {
   label: string;
   start: string;
   end: string;
+  /** Hex colour of the cell (set from the hotel's catalog). */
+  color?: string;
+  /** Shifts created by the hotel: "work" counts as a worked day, "off" as a day without work. */
+  custom?: "work" | "off";
+  /** A shift of the hotel that is no longer offered (cells that use it still show it). */
+  archived?: boolean;
 }
 
-export const SHIFTS: Record<ShiftCode, ShiftDef> = {
+/** Live table of shifts: starts as the defaults and is rewritten by `applyCatalog` with the hotel's names, hours and colours. */
+export const SHIFTS: Record<string, ShiftDef> = {
   M: { code: "M", label: "Mañana", start: "07:00", end: "15:00" },
   T: { code: "T", label: "Tarde", start: "15:00", end: "23:00" },
   N: { code: "N", label: "Noche", start: "23:00", end: "07:00" },
@@ -77,7 +88,7 @@ export interface GeneratorConfig {
   /** How strongly to prefer the baseline (default 80). Higher values change fewer cells but may break block rotation. */
   baselineKeep?: number;
   /** Fixed non-working days per staff id: "V" vacation or "B" not employed that day. Cover is planned around them. */
-  unavailable?: Record<string, Record<string, "V" | "A" | "B">>;
+  unavailable?: Record<string, Record<string, ShiftCode>>;
   seed?: number;
 }
 
@@ -96,11 +107,23 @@ export interface GeneratorResult {
 }
 
 /** Letter shown to users, matching the hotel's Excel: L for libre, P for the mozo shift. */
-export const DISPLAY_CODE: Record<ShiftCode, string> = { M: "M", T: "T", N: "N", S: "S", P: "P", MZ: "P", D: "L", V: "V", A: "A", B: "" };
-export const displayCode = (c: ShiftCode) => DISPLAY_CODE[c];
+export const DISPLAY_CODE: Record<string, string> = { M: "M", T: "T", N: "N", S: "S", P: "P", MZ: "P", D: "L", V: "V", A: "A", B: "" };
+export const displayCode = (c: ShiftCode) => DISPLAY_CODE[c] ?? c;
 
 /** True for any day without work (libre, vacaciones, fuera de plantilla). */
-export const isOff = (c: ShiftCode | undefined) => !c || c === "D" || c === "V" || c === "A" || c === "B";
+export const isOff = (c: ShiftCode | undefined) => !c || c === "D" || c === "V" || c === "A" || c === "B" || SHIFTS[c]?.custom === "off";
+
+/** The three shifts that must be covered every day. */
+export const isCoverShift = (c: string | undefined): c is "M" | "T" | "N" => c === "M" || c === "T" || c === "N";
+
+/** Day-off and preferred-shift requests the planner can re-plan around. */
+export const isPlanKind = (c: string): c is "D" | "V" | "A" | "M" | "T" | "N" => c === "D" || c === "V" || c === "A" || isCoverShift(c);
+
+/** A shift created by the hotel (not one of the ten built in). */
+export const isCustomShift = (c: ShiftCode | undefined) => Boolean(c && SHIFTS[c]?.custom);
+
+/** Cells the planner never moves: vacaciones, ausencia, fuera de plantilla and the hotel's own shifts. */
+export const isFixedCell = (c: ShiftCode | undefined) => c === "V" || c === "A" || c === "B" || isCustomShift(c);
 
 /** Whether the person is on the roster on that day (alta/baja dates). */
 export const isActive = (s: Pick<Staff, "activeFrom" | "activeTo">, date: string) =>

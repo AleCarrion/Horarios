@@ -1,6 +1,6 @@
 import { isHoliday } from "./holidays";
 import { isWeekend, monthDates } from "./dates";
-import { SHIFTS, isOff, type Schedule, type Staff } from "./types";
+import { SHIFTS, isCoverShift, isOff, type Schedule, type Staff } from "./types";
 
 export interface PersonSummary {
   staffId: string;
@@ -44,7 +44,7 @@ export function summarizeMonth(schedule: Schedule, staff: Staff[], year: number,
       else if (c === "A") r.ausencias++;
       if (isOff(c)) continue;
       r.worked++;
-      if (c === "M" || c === "T" || c === "N") r[c]++;
+      if (isCoverShift(c)) r[c]++;
       else r.other++;
       if (isWeekend(d)) r.weekends++;
       if (isHoliday(d, extraHolidays)) r.holidays++;
