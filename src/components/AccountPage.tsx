@@ -8,6 +8,7 @@ import { remoteConfigured } from "@/lib/supabase";
 import { SYNC_DOT, SYNC_LABEL, type SyncStatus } from "@/lib/syncStatus";
 import { useAuth } from "@/lib/useAuth";
 import { readQueue } from "@/lib/useRemoteSchedule";
+import { AccountChip } from "./AccountChip";
 import { AppNav } from "./AppNav";
 import { LogoMark } from "./icons";
 import { MobileTabBar } from "./MobileTabBar";
@@ -66,10 +67,13 @@ export function AccountPage() {
             </div>
           </div>
           <div className="max-sm:hidden"><AppNav /></div>
+          {remoteConfigured && auth.email && <div className="ml-auto"><AccountChip auth={auth} status="synced" /></div>}
         </div>
       </header>
 
-      <main className="mx-auto w-full min-w-0 max-w-[560px] space-y-5 p-4">
+      <main className="mx-auto w-full min-w-0 max-w-[1200px] p-4">
+        {/* left edge in line with the header */}
+        <div className="max-w-[560px] space-y-5">
         <h2 className="anim-fade-up text-xl font-bold tracking-tight sm:text-2xl">Mi cuenta</h2>
 
         {!remoteConfigured ? (
@@ -122,6 +126,7 @@ export function AccountPage() {
             </button>
           </>
         )}
+        </div>
       </main>
       <MobileTabBar pending={pending} />
     </>

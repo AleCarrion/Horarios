@@ -5,6 +5,7 @@ import type { MonthState } from "./domain/monthStatus";
 import { fromMonthRow, sameState, toMonthRow, type MonthRow } from "./monthStateSync";
 import { getSupabase } from "./supabase";
 import type { AuthState } from "./useAuth";
+import { channelName } from "./realtime";
 
 interface Args {
   auth: AuthState;
@@ -36,7 +37,7 @@ export function useRemoteMonthState({ auth, year, month, onRemote }: Args) {
         if (alive && !error && data) cb.current(fromMonthRow(data as MonthRow));
       });
     const channel = sb
-      .channel(`month-${year}-${month}`)
+      .channel(channelName(`month-${year}-${month}`))
       .on("postgres_changes", { event: "*", schema: "public", table: "schedule_months" }, (p) => {
         const row = p.new as MonthRow | undefined;
         if (row && row.year === year && row.month === month) cb.current(fromMonthRow(row));

@@ -6,6 +6,7 @@ import { readCatalog, setCatalog } from "./catalogStore";
 import { DEFAULT_CATALOG, type Catalog } from "./domain/catalog";
 import { getSupabase } from "./supabase";
 import type { AuthState } from "./useAuth";
+import { channelName } from "./realtime";
 
 const DIRTY = "horarios_catalog_dirty"; // not "horarios:" so it is not part of the data backups
 const isDirty = () => {
@@ -24,9 +25,10 @@ const setDirty = (on: boolean) => {
 
 /**
  * The hotel's names, colours and puestos are shared between devices through `public.app_catalog`.
+ * Mounted once for the whole app (CatalogProvider); the settings page uses it with `listen: false`, only to save.
  * `save` returns an error message when sending failed (it is retried when the page is opened again).
  */
-export function useRemoteCatalog(auth: AuthState) {
+export function useRemoteCatalog(auth: AuthState, { listen = true }: { listen?: boolean } = {}) {
   const sb = getSupabase();
   const canEdit = Boolean(sb) && auth.isEditor;
   const saving = useRef(Promise.resolve<string | null>(null));
@@ -44,7 +46,7 @@ export function useRemoteCatalog(auth: AuthState) {
   );
 
   useEffect(() => {
-    if (!sb || !auth.ready || !auth.email) return;
+    if (!sb || !listen || !auth.ready || !auth.email) return;
     let alive = true;
     void sb
       .from("app_catalog")
@@ -61,7 +63,7 @@ export function useRemoteCatalog(auth: AuthState) {
         } else if (data) setCatalog(fromCatalogRow(data));
       });
     const channel = sb
-      .channel("catalog")
+      .channel(channelName("catalog"))
       .on("postgres_changes", { event: "*", schema: "public", table: "app_catalog" }, (p) => {
         const row = p.new as { catalog?: unknown } | undefined;
         if (row?.catalog) setCatalog(fromCatalogRow({ catalog: row.catalog }));
@@ -71,7 +73,7 @@ export function useRemoteCatalog(auth: AuthState) {
       alive = false;
       void sb.removeChannel(channel);
     };
-  }, [sb, auth.ready, auth.email, canEdit, push]);
+  }, [sb, listen, auth.ready, auth.email, canEdit, push]);
 
   /** Applies the change here at once and sends it to the server (after the previous save, so order is kept). */
   const save = useCallback(

@@ -7,6 +7,7 @@ import { clearScheduleCache, nextMonth, prevMonth, storageKey } from "./monthSto
 import { getSupabase, remoteConfigured } from "./supabase";
 import { coalesce, diffSchedules, isMissingFunction, rowsToSchedule, scheduleToRows, withoutAt, type Row } from "./sync";
 import type { AuthState } from "./useAuth";
+import { channelName } from "./realtime";
 
 const QUEUE_KEY = "horarios:queue";
 
@@ -137,7 +138,7 @@ export function useRemoteSchedule({ year, month, present, auth, onLoaded, onRemo
         setLoaded(key);
       });
     const channel = sb
-      .channel(`schedule-${year}-${month}`)
+      .channel(channelName(`schedule-${year}-${month}`))
       .on("postgres_changes", { event: "*", schema: "public", table: "monthly_schedule" }, (p) => {
         const row = p.new as Row | undefined;
         if (!row?.day || row.day < first || row.day > last) return;

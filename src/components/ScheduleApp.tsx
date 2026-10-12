@@ -563,14 +563,14 @@ export function ScheduleApp() {
           <div className="order-2"><AppNav /></div>
 
           {remoteConfigured && (
-            <div className="order-3 ml-auto xl:order-5 xl:ml-0">
+            <div className="order-3 ml-auto">
               <AccountChip auth={auth} status={(team.pending || requestsRemote.pending || locksRemote.pending) && remote.status === "synced" ? "pending" : remote.status} />
             </div>
           )}
 
-          <div className="order-4 h-0 basis-full xl:hidden" aria-hidden="true" />
+          <div className="order-4 h-0 basis-full" aria-hidden="true" />
 
-          <div className="order-5 flex items-center justify-between gap-1 rounded-2xl border border-line bg-card-solid/70 p-1 xl:order-3 xl:mx-auto">
+          <div className="order-5 flex items-center justify-between gap-1 rounded-2xl border border-line bg-card-solid/70 p-1">
             <button className={`${iconBtn} !h-9 !w-9 border-0 shadow-none`} onClick={() => shiftMonth(-1)} aria-label="Mes anterior">
               <ChevronLeft />
             </button>
@@ -582,7 +582,7 @@ export function ScheduleApp() {
             </button>
           </div>
 
-          <div className="order-6 ml-auto flex items-center gap-2 xl:order-4 xl:ml-0">
+          <div className="order-6 ml-auto flex items-center gap-2">
             {!auth.isWorker && (
               <>
                 <button className={iconBtn} onClick={() => dispatch({ type: "undo" })} disabled={readOnly || !h.past.length} aria-label="Deshacer" title="Deshacer">

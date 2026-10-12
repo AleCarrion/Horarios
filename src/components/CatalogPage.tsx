@@ -59,7 +59,7 @@ export function CatalogPage() {
   const auth = useAuth();
   const readOnly = remoteConfigured && !auth.isEditor;
   const catalog = useCatalog();
-  const remote = useRemoteCatalog(auth);
+  const remote = useRemoteCatalog(auth, { listen: false });
   const [draft, setDraft] = useState<Catalog>(catalog);
   const [status, setStatus] = useState<"" | "saving" | "saved" | string>("");
   const [confirmReset, setConfirmReset] = useState(false);
@@ -129,7 +129,9 @@ export function CatalogPage() {
         </div>
       </header>
 
-      <main className="mx-auto w-full min-w-0 max-w-[820px] space-y-6 p-4">
+      <main className="mx-auto w-full min-w-0 max-w-[1200px] p-4">
+        {/* left edge in line with the header */}
+        <div className="max-w-[820px] space-y-6">
         <div className="anim-fade-up">
           <h2 className="flex items-center gap-2 text-xl font-bold tracking-tight sm:text-2xl"><PaletteIcon width={22} height={22} /> Turnos y puestos</h2>
           <p className="mt-1 max-w-xl text-sm text-muted">
@@ -249,6 +251,7 @@ export function CatalogPage() {
           <button type="button" disabled={!dirty || readOnly} onClick={() => setConfirmReset(true)} className="rounded-xl border border-line px-4 py-2 text-sm font-semibold transition hover:bg-brand/10 disabled:opacity-40">
             Volver a los valores de siempre
           </button>
+        </div>
         </div>
       </main>
       {confirmReset && (

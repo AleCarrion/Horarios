@@ -6,6 +6,7 @@ import { diffLocks, locksFromRows, locksToRows, unionLocks, type LockRow } from 
 import { readLocks, type Locks } from "./monthStore";
 import { getSupabase } from "./supabase";
 import type { AuthState } from "./useAuth";
+import { channelName } from "./realtime";
 
 interface Args {
   auth: AuthState;
@@ -51,7 +52,7 @@ export function useRemoteLocks({ auth, year, month, locks, onLoaded }: Args) {
     if (!sb || !auth.ready) return;
     const first = setTimeout(() => void load(true), 0);
     const channel = sb
-      .channel(`locks-${key}`)
+      .channel(channelName(`locks-${key}`))
       .on("postgres_changes", { event: "*", schema: "public", table: "locked_cells" }, () => void load(false))
       .subscribe();
     return () => {

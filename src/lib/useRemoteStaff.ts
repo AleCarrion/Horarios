@@ -5,6 +5,7 @@ import type { Staff } from "./domain/types";
 import { fromStaffRows, toStaffRows, type StaffRow } from "./staffSync";
 import { getSupabase } from "./supabase";
 import type { AuthState } from "./useAuth";
+import { channelName } from "./realtime";
 
 interface Args {
   auth: AuthState;
@@ -48,7 +49,7 @@ export function useRemoteStaff({ auth, staff, onLoaded }: Args) {
     if (!sb || !auth.ready) return;
     const first = setTimeout(() => void load(), 0);
     const channel = sb
-      .channel("staff-changes")
+      .channel(channelName("staff-changes"))
       .on("postgres_changes", { event: "*", schema: "public", table: "staff" }, () => void load())
       .subscribe();
     return () => {

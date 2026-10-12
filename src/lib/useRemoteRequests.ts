@@ -5,6 +5,7 @@ import type { ShiftRequest } from "./domain/requests";
 import { fromRequestRows, mergeRequests, toRequestRow, type RequestRow } from "./requestsSync";
 import { getSupabase } from "./supabase";
 import type { AuthState } from "./useAuth";
+import { channelName } from "./realtime";
 
 interface Args {
   auth: AuthState;
@@ -45,7 +46,7 @@ export function useRemoteRequests({ auth, requests, onLoaded }: Args) {
     if (!sb || !auth.ready) return;
     const first = setTimeout(() => void load(), 0);
     const channel = sb
-      .channel("requests-changes")
+      .channel(channelName("requests-changes"))
       .on("postgres_changes", { event: "*", schema: "public", table: "requests" }, () => void load())
       .subscribe();
     return () => {

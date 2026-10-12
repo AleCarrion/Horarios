@@ -97,7 +97,9 @@ export function AccessPage() {
         </div>
       </header>
 
-      <main className="mx-auto w-full min-w-0 max-w-[720px] space-y-5 p-4">
+      <main className="mx-auto w-full min-w-0 max-w-[1200px] p-4">
+        {/* left edge in line with the header */}
+        <div className="max-w-[720px] space-y-5">
         <div className="anim-fade-up">
           <h2 className="text-xl font-bold tracking-tight sm:text-2xl">Accesos</h2>
           <p className="mt-1 max-w-xl text-sm text-muted">
@@ -213,6 +215,7 @@ export function AccessPage() {
             </ul>
           </>
         )}
+        </div>
       </main>
 
       {toRemove && (

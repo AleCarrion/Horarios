@@ -89,7 +89,9 @@ export function RulesPage() {
         </div>
       </header>
 
-      <main className="mx-auto w-full min-w-0 max-w-[820px] space-y-5 p-4">
+      <main className="mx-auto w-full min-w-0 max-w-[1200px] p-4">
+        {/* left edge in line with the header */}
+        <div className="max-w-[820px] space-y-5">
         <div className="anim-fade-up">
           <h2 className="text-xl font-bold tracking-tight sm:text-2xl">Reglas del horario</h2>
           <p className="mt-1 max-w-xl text-sm text-muted">
@@ -157,6 +159,7 @@ export function RulesPage() {
           <button type="button" disabled={isDefault || readOnly} onClick={() => change(DEFAULT_RULES)} className="rounded-xl border border-line px-4 py-2 text-sm font-semibold transition hover:bg-brand/10 disabled:opacity-40">
             Volver a las reglas del hotel
           </button>
+        </div>
         </div>
       </main>
       <MobileTabBar pending={pending} />
