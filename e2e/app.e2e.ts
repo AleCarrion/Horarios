@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { Workbook } from "exceljs";
 
 /** A day near the end of the shown month, far enough from "today" to be editable. */
 async function lateDay(page: Page) {
@@ -380,6 +381,9 @@ test.describe("móvil", () => {
     page,
   }) => {
     await open(page);
+    // phones switch to the week view right after loading: tap once that has happened (and the background plan is done)
+    await expect(page.getByRole("button", { name: "Semana", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await page.waitForTimeout(1500);
     await page.locator(".schedule-table tbody button").nth(10).tap();
     const box = await page.getByRole("listbox").boundingBox();
     expect(box).not.toBeNull();
@@ -482,4 +486,42 @@ test.describe("móvil (exportar)", () => {
     ]);
     expect(download.suggestedFilename()).toMatch(/\.pdf$/);
   });
+});
+
+test("importar un Excel del hotel (pintado con colores): vista previa, dudas y cargar", async ({ page, viewport }, info) => {
+  test.skip((viewport?.width ?? 1280) < 640, "la cuadrícula completa es de escritorio");
+  await open(page);
+  const month = await page.evaluate(() => document.querySelector("[data-colhead]")!.getAttribute("data-colhead")!.slice(0, 7));
+  const [y, m] = month.split("-").map(Number);
+  const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  // a sheet like the hotel's: title, day numbers, names, cells painted (no letters) and one cell nobody can read
+  const wb = new Workbook();
+  const ws = wb.addWorksheet("Horario");
+  ws.addRow(["HORARIO RECEPCIÓN"]);
+  ws.addRow(["", ...Array.from({ length: days }, (_, i) => i + 1)]);
+  const paint = (row: number, col: number, argb: string) => (ws.getCell(row, col).fill = { type: "pattern", pattern: "solid", fgColor: { argb } });
+  ws.addRow(["ALEJANDRO"]);
+  ws.addRow(["Marcos"]);
+  for (let d = 1; d <= days; d++) {
+    paint(3, d + 1, d % 3 === 0 ? "FF92D050" : "FFFFFF00"); // libre every third day, mañana otherwise
+    ws.getCell(4, d + 1).value = d === 5 ? "¿?" : d % 3 === 0 ? "L" : "T";
+  }
+  const file = info.outputPath("horario.xlsx");
+  await wb.xlsx.writeFile(file);
+
+  await page.getByRole("button", { name: /Exportar/ }).click();
+  await page.getByRole("menuitem", { name: /Importar un Excel/ }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.locator('input[type="file"]').setInputFiles(file);
+  await expect(dialog).toContainText("2 personas reconocidas");
+  await expect(dialog).toContainText("1 con dudas");
+  await dialog.getByLabel(/Marcos, día 5/).selectOption("T");
+  await expect(dialog).not.toContainText("con dudas");
+  await dialog.getByRole("button", { name: /Cargar en/ }).click();
+  await expect(dialog).toBeHidden();
+  const cell = (id: string, d: number) => page.locator(`[data-row="${id}"][data-col="${month}-${String(d).padStart(2, "0")}"]`);
+  await expect(cell("alejandro", 1)).toHaveText("M");
+  await expect(cell("alejandro", 3)).toHaveText("L");
+  await expect(cell("marcos", 5)).toHaveText("T");
+  await expect(cell("marcos", 1)).toHaveAttribute("aria-label", /bloqueada/);
 });

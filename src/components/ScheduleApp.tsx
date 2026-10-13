@@ -69,6 +69,7 @@ const MyRequestsPanel = dynamic(() => import("./MyRequestsPanel").then((m) => m.
 const PlanDialog = dynamic(() => import("./PlanDialog").then((m) => m.PlanDialog));
 const CompareMonths = dynamic(() => import("./CompareMonths").then((m) => m.CompareMonths));
 const HistoryPanel = dynamic(() => import("./HistoryPanel").then((m) => m.HistoryPanel));
+const ImportDialog = dynamic(() => import("./ImportDialog").then((m) => m.ImportDialog));
 
 function reducer(h: ReturnType<typeof createHistory>, a: Action) {
   switch (a.type) {
@@ -110,6 +111,7 @@ export function ScheduleApp() {
   const [log, setLog] = useState<LogEntry[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const [today, setToday] = useState<string | null>(null);
   const [locks, setLocks] = useState<Locks>({});
@@ -546,6 +548,7 @@ export function ScheduleApp() {
     ...(auth.isWorker && !mine ? [] : [{ label: peopleLabel, hint: auth.isWorker ? "Tu mes en calendario" : "Una hoja por persona", icon: <UsersIcon />, onClick: () => void exportPeoplePdf() }]),
     { label: "Excel (.xlsx)", hint: "Con colores, totales y resumen", icon: <TableIcon />, onClick: () => void exportXlsx() },
     { label: "Imprimir", icon: <PrinterIcon />, onClick: printMonth },
+    ...(w || readOnly ? [] : [{ label: "Importar un Excel", hint: "Cargar un horario que ya tienes hecho", icon: <TableIcon />, onClick: () => setImportOpen(true) }]),
     ...(w ? [] : [{ label: "Guardar copia de seguridad", hint: "Descarga todo: equipo, meses, solicitudes y bloqueos", icon: <DownloadIcon />, onClick: saveBackup }]),
     ...(w || remoteReadOnly ? [] : [{ label: "Restaurar copia de seguridad", icon: <DownloadIcon />, onClick: () => restoreInput.current?.click() }]),
     ...(!w && remote.draft ? [{ label: "Publicar mes", icon: <DownloadIcon />, onClick: () => void remote.publish() }] : []),
@@ -641,7 +644,7 @@ export function ScheduleApp() {
               <InboxIcon />
               {badge > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-[11px] font-bold text-white shadow">{badge}</span>}
             </button>
-            <ExportMenu onMonthPdf={() => void exportMonthPdf()} onPeoplePdf={() => void exportPeoplePdf()} peopleLabel={peopleLabel} onXlsx={() => void exportXlsx()} onPrint={printMonth} onCsv={exportCSV} onBackup={auth.isWorker ? undefined : saveBackup} onRestore={remoteReadOnly ? undefined : () => restoreInput.current?.click()} busy={exporting} />
+            <ExportMenu onMonthPdf={() => void exportMonthPdf()} onPeoplePdf={() => void exportPeoplePdf()} peopleLabel={peopleLabel} onXlsx={() => void exportXlsx()} onPrint={printMonth} onCsv={exportCSV} onBackup={auth.isWorker ? undefined : saveBackup} onRestore={remoteReadOnly ? undefined : () => restoreInput.current?.click()} onImport={readOnly || auth.isWorker ? undefined : () => setImportOpen(true)} busy={exporting} />
             {!auth.isWorker && <button
               disabled={readOnly}
               onClick={() => setConfirmRegenerate(true)}
@@ -817,6 +820,22 @@ export function ScheduleApp() {
 
       </main>
       <MobileTabBar pending={badge} onRequests={() => setPanelOpen(true)} />
+      {importOpen && (
+        <ImportDialog
+          staff={visible}
+          year={ym.year}
+          month={ym.month}
+          current={h.present}
+          onClose={() => setImportOpen(false)}
+          onApply={(edits, lock) => {
+            logLabel.current = "Importar Excel";
+            if (lock) editCells(edits);
+            else dispatch({ type: "edit", edits });
+            setImportOpen(false);
+          }}
+        />
+      )}
+
       <CompareMonths open={compareOpen} onClose={() => setCompareOpen(false)} staff={visible} year={ym.year} month={ym.month} schedule={shown} load={loadMonth} />
       <LinkData auth={auth} />
       <HistoryPanel

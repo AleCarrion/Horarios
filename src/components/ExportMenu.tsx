@@ -13,11 +13,13 @@ interface Props {
   onCsv: () => void;
   onBackup?: () => void;
   onRestore?: () => void;
+  /** Load a schedule the manager already has in Excel/CSV (editors only). */
+  onImport?: () => void;
   /** Shown while a file is being prepared. */
   busy?: boolean;
 }
 
-export function ExportMenu({ onMonthPdf, onPeoplePdf, peopleLabel, onXlsx, onPrint, onCsv, onBackup, onRestore, busy }: Props) {
+export function ExportMenu({ onMonthPdf, onPeoplePdf, peopleLabel, onXlsx, onPrint, onCsv, onBackup, onRestore, onImport, busy }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -74,6 +76,8 @@ export function ExportMenu({ onMonthPdf, onPeoplePdf, peopleLabel, onXlsx, onPri
           <div className="my-1 border-t border-line" />
           {entry(<PrinterIcon width={16} height={16} className="text-muted" />, "Imprimir", "Lo que ves, con el diálogo del navegador", onPrint)}
           {entry(<TableIcon width={16} height={16} className="text-muted" />, "CSV", "Texto simple, para otros programas", onCsv)}
+          {onImport && <div className="my-1 border-t border-line" />}
+          {onImport && entry(<TableIcon width={16} height={16} className="rotate-180 text-emerald-600" />, "Importar un Excel…", "Cargar en este mes un horario que ya tienes hecho", onImport)}
           {(onBackup || onRestore) && <div className="my-1 border-t border-line" />}
           {onBackup && entry(<DownloadIcon width={16} height={16} className="text-brand" />, "Guardar copia de seguridad", "Todo el equipo, meses y solicitudes", onBackup)}
           {onRestore && entry(<DownloadIcon width={16} height={16} className="rotate-180 text-brand" />, "Restaurar copia…", "Sustituye lo de este dispositivo", onRestore)}
