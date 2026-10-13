@@ -97,8 +97,23 @@ export function RulesPage() {
         <fieldset disabled={readOnly} className="min-w-0 space-y-5">
         <section aria-label="Descansos y rachas" className="space-y-3">
           <Stepper label="Máximo de días libres seguidos" hint="Más de esto sale como aviso (los mozos y las vacaciones no cuentan)." value={rules.maxRestRun} min={1} max={7} onChange={(n) => change({ maxRestRun: n })} />
-          <Stepper label="Máximo de días trabajados seguidos" hint="Por encima de esto, aviso. El generador solo llega aquí si no puede cubrir un turno de otra forma." value={rules.maxWorkRun} min={3} max={10} onChange={(n) => change({ maxWorkRun: n })} />
+          <Stepper label="Máximo de días trabajados seguidos" hint="Por encima de esto, aviso. Lo normal son 5: el generador nunca planifica 6 días seguidos." value={rules.maxWorkRun} min={3} max={10} onChange={(n) => change({ maxWorkRun: n })} />
           <Stepper label="Días seguidos que intenta no pasar" hint="Lo normal del generador (no puede ser más que el máximo)." value={rules.preferredWorkRun} min={2} max={rules.maxWorkRun} onChange={(n) => change({ preferredWorkRun: n })} />
+          <Stepper label="Máximo de días libres al mes" hint="Por persona (no cuentan vacaciones ni bajas; los mozos y la dirección van aparte)." value={rules.maxMonthlyRest} min={6} max={16} onChange={(n) => change({ maxMonthlyRest: n })} />
+          <Stepper label="Horas mínimas entre un turno y el siguiente" hint="El Estatuto pide 12 h; en hostelería se puede bajar a 10 h compensándolo en 4 semanas (RD 1561/1995). El generador intenta siempre 12." value={rules.minRestHours} min={8} max={16} onChange={(n) => change({ minRestHours: n })} />
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-card-solid/70 p-4">
+            <div className="min-w-0 flex-1 basis-56">
+              <p className="font-semibold">Descanso semanal seguido</p>
+              <p className="text-sm text-muted">Convenio de Hostelería de Sevilla (art. 30): día y medio en centros de hasta 25 personas fijas; dos días si hay más. Se puede juntar en 14 días.</p>
+            </div>
+            <div role="group" aria-label="Descanso semanal seguido" className="flex rounded-xl border border-line p-0.5 text-sm font-semibold">
+              {[36, 48].map((h) => (
+                <button key={h} type="button" aria-pressed={rules.weeklyRestHours === h} onClick={() => change({ weeklyRestHours: h })} className={`min-h-10 rounded-lg px-3 transition ${rules.weeklyRestHours === h ? "bg-brand-solid text-white" : "text-muted hover:bg-brand/10"}`}>
+                  {h === 36 ? "Día y medio (36 h)" : "Dos días (48 h)"}
+                </button>
+              ))}
+            </div>
+          </div>
           <label className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-card-solid/70 p-4">
             <span className="min-w-0">
               <span className="block font-semibold">Solo una persona de partido al día</span>

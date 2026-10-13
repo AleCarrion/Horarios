@@ -60,7 +60,7 @@ function ForBoss() {
           Toca su casilla → <b>Ausencia / baja</b>. No hay plazo ni días protegidos: la app te dice <b>a quién avisar</b> para cubrir.
         </Step>
         <Step n={6} title="Equipo y reglas">
-          En <b>Equipo</b> añades o das de baja a personas, cambias su puesto o sus fechas (con vista previa antes de aplicar). En <b>Reglas</b> ajustas los días máximos seguidos de trabajo o descanso, lo de un solo partido al día y los festivos locales.
+          En <b>Equipo</b> añades o das de baja a personas, cambias su puesto o sus fechas (con vista previa antes de aplicar). En <b>Reglas</b> ajustas los días seguidos de trabajo (5 como mucho) y de descanso, los libres al mes (11), las horas entre turnos, el descanso semanal del convenio, el partido único y los festivos locales.
         </Step>
         <Step n={7} title="Publicar y guardar">
           <b>Publicar mes</b> lo da por bueno (no se edita por accidente; <b>Reabrir</b> para corregir). El reloj abre el <b>historial</b>: qué se cambió y cuándo, con «Volver a…» en cada casilla. En <b>Exportar</b> tienes el PDF del mes, un PDF por persona, el Excel con colores y la <b>copia de seguridad</b>: guárdala de vez en cuando.

@@ -1,6 +1,7 @@
 import { monthDates } from "./dates";
 import { allowedShifts } from "./rules";
 import { DEFAULT_RULES, type Rules } from "./ruleset";
+import { isoMinutes, restBetween, restBlocks } from "./hours";
 import { isActive, isCoverShift, isOff, type Schedule, type ShiftCode, type Staff } from "./types";
 
 export interface Coverage {
@@ -11,7 +12,7 @@ export interface Coverage {
 }
 
 export interface Issue {
-  kind: "coverage" | "forbidden" | "rest" | "streak" | "restStreak";
+  kind: "coverage" | "forbidden" | "rest" | "streak" | "restStreak" | "monthlyRest" | "weeklyRest";
   date: string;
   staffId?: string;
   message: string;
@@ -51,7 +52,7 @@ export function validateSchedule(schedule: Schedule, staff: Staff[], year: numbe
   }
 
   // What each person was doing right before the 1st (the previous month), so streaks and rest runs carry over.
-  const before = (id: string): { streak: number; restRun: number; prev: ShiftCode | undefined } => {
+  const before = (id: string): { streak: number; restRun: number; prev: ShiftCode | undefined; prevDate?: string } => {
     const row = history?.[id];
     if (!row) return { streak: 0, restRun: 0, prev: undefined };
     const days = Object.keys(row).filter((d) => d < dates[0]).sort();
@@ -59,7 +60,8 @@ export function validateSchedule(schedule: Schedule, staff: Staff[], year: numbe
     let restRun = 0;
     for (let i = days.length - 1; i >= 0 && !isOff(row[days[i]]); i--) streak++;
     for (let i = days.length - 1; i >= 0 && row[days[i]] === "D"; i--) restRun++;
-    return { streak, restRun, prev: days.length ? row[days[days.length - 1]] : undefined };
+    const last = days[days.length - 1];
+    return { streak, restRun, prev: last ? row[last] : undefined, prevDate: last };
   };
 
   for (const s of staff) {
@@ -79,12 +81,40 @@ export function validateSchedule(schedule: Schedule, staff: Staff[], year: numbe
         issues.push({ kind: "forbidden", date: d, staffId: s.id, message: `${s.name} no está en plantilla el ${d}` });
       if (!allowedShifts(s).includes(code))
         issues.push({ kind: "forbidden", date: d, staffId: s.id, message: `${s.name} no puede hacer ${code}` });
-      if ((i > 0 || start.prev) && (s.role === "receptionist" || s.extraShifts)) {
-        const prev = i > 0 ? schedule[s.id][dates[i - 1]] : start.prev;
-        if ((prev === "T" && code === "M") || (s.role === "receptionist" && prev === "N" && !isOff(code) && code !== "N"))
-          issues.push({ kind: "rest", date: d, staffId: s.id, message: `${s.name}: descanso insuficiente el ${d}` });
-      }
+      // Estatuto de los Trabajadores, art. 34.3: at least 12 h between the end of a shift and the start of the next
+      const prevDate = i > 0 ? dates[i - 1] : start.prevDate;
+      const prev = i > 0 ? schedule[s.id]?.[dates[i - 1]] : start.prev;
+      const gap = prevDate ? restBetween(prev, prevDate, code, d) : null;
+      if (gap !== null && gap < rules.minRestHours * 60)
+        issues.push({ kind: "rest", date: d, staffId: s.id, message: `${s.name}: solo ${Math.round((gap / 60) * 10) / 10} h de descanso entre turnos el ${d} (mínimo ${rules.minRestHours} h)` });
     });
+
+    // Most libres in a month (mozos follow their 5-5 cycle; the director rests every weekend and holiday)
+    if (s.role !== "mozo" && s.role !== "director") {
+      const libres = dates.filter((d) => schedule[s.id]?.[d] === "D");
+      if (libres.length > rules.maxMonthlyRest)
+        issues.push({ kind: "monthlyRest", date: libres[rules.maxMonthlyRest], staffId: s.id, message: `${s.name}: ${libres.length} días libres este mes (máximo ${rules.maxMonthlyRest})` });
+    }
+
+    // Weekly rest (convenio de Sevilla, art. 30): every Mon–Sun week a rest of weeklyRestHours in a row, or a double one within 14 days
+    const row = { ...history?.[s.id], ...schedule[s.id] };
+    const need = rules.weeklyRestHours * 60;
+    // each week belongs to the month that has its Thursday (as ISO weeks do); days of next month are not planned yet and count as rest
+    for (const thursday of dates.filter((d) => new Date(d + "T00:00:00Z").getUTCDay() === 4)) {
+      const mon = isoMinutes(thursday) - 3 * 1440;
+      const sun = mon + 6 * 1440;
+      const sunday = new Date(sun * 60000).toISOString().slice(0, 10);
+      const span = [];
+      for (let t = mon - 7 * 1440; t <= sun + 7 * 1440; t += 1440) span.push(new Date(t * 60000).toISOString().slice(0, 10));
+      const blocks = restBlocks(row, span);
+      const weekEnd = sun + 1440;
+      const overlap = ([a, b]: [number, number], x: number, y: number) => Math.min(b, y) - Math.max(a, x);
+      const ok =
+        blocks.some((b) => overlap(b, mon, weekEnd) >= need) ||
+        blocks.some((b) => b[1] - b[0] >= 2 * need && (overlap(b, mon - 7 * 1440, mon) > 0 || overlap(b, weekEnd, weekEnd + 7 * 1440) > 0));
+      if (!ok)
+        issues.push({ kind: "weeklyRest", date: sunday <= dates[dates.length - 1] ? sunday : dates[dates.length - 1], staffId: s.id, message: `${s.name}: la semana que acaba el ${sunday} no tiene ${rules.weeklyRestHours} h seguidas de descanso` });
+    }
   }
   return { coverage, issues };
 }

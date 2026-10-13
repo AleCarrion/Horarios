@@ -1,5 +1,6 @@
 import { holidaysOf } from "./holidays";
 import { DEFAULT_RULES, localHolidaysOf } from "./ruleset";
+import { improveSchedule } from "./improve";
 import { validateSchedule } from "./validate";
 import { diffDays, isWeekend, monthDates, toISO } from "./dates";
 import { isActive, isCoverShift, isFixedCell, isOff, type GeneratorConfig, type GeneratorResult, type Schedule, type ShiftCode, type Staff, type Warning } from "./types";
@@ -405,11 +406,22 @@ export function generateSchedule(config: GeneratorConfig): GeneratorResult {
   for (let i = 0; i < ATTEMPTS; i++) {
     const result = generateOnce({ ...config, seed: seed + i });
     const issues = validateSchedule(result.schedule, config.staff, config.year, config.month, config.history, config.rules).issues;
-    const hard = issues.filter((x) => x.kind === "coverage" || x.kind === "restStreak" || x.kind === "streak").length;
+    const hard = issues.filter((x) => x.kind === "coverage" || x.kind === "restStreak" || x.kind === "streak" || x.kind === "rest").length;
+    const legal = issues.filter((x) => x.kind === "weeklyRest" || x.kind === "monthlyRest").length;
     const soft = result.warnings.filter((w) => w.kind === "cap" || w.kind === "streak").length;
-    const cost = hard * 1000 + soft;
+    const cost = hard * 1000 + legal * 50 + soft;
     if (!best || cost < best.cost) best = { result, cost };
     if (cost === 0) break;
   }
-  return best!.result;
+  const chosen = best!.result;
+  if (best!.cost === 0) return chosen;
+  // what the greedy pass left (rest between shifts, weekly rest, libres per month…) is fixed by exchanging shifts
+  // the night auditor's rests stay where they were given (when they were given)
+  const night = config.jcRestDays ? new Set(config.staff.filter((s) => s.role === "night_auditor").map((s) => s.id)) : new Set<string>();
+  const frozen = (id: string, d: string) => frozenBy(config)(id, d) || night.has(id);
+  return { ...chosen, schedule: improveSchedule(chosen.schedule, config.staff, config.year, config.month, { rules: config.rules, history: config.history, frozen }) };
 }
+
+/** Cells the improvement pass must leave alone: pinned ones and the fixed days off. */
+export const frozenBy = (config: Pick<GeneratorConfig, "pinned" | "unavailable">) => (id: string, d: string) =>
+  config.pinned?.[id]?.[d] !== undefined || config.unavailable?.[id]?.[d] !== undefined;

@@ -1,9 +1,10 @@
-import { generateOnce } from "./generator";
+import { frozenBy, generateOnce } from "./generator";
+import { improveSchedule } from "./improve";
 import { diffDays, monthDates, toISO } from "./dates";
 import { allowedShifts } from "./rules";
 import { isActive, isCustomShift, isFixedCell, isOff, type Schedule, type ShiftCode, type Staff, type Warning } from "./types";
 import { validateSchedule, type Issue } from "./validate";
-import type { Rules } from "./ruleset";
+import { DEFAULT_RULES, type Rules } from "./ruleset";
 
 export interface RepairContext {
   year: number;
@@ -54,7 +55,7 @@ export interface Plan {
   notice?: { daysAhead: number; short: boolean };
 }
 
-const HARD: Issue["kind"][] = ["coverage", "forbidden", "rest", "streak", "restStreak"];
+const HARD: Issue["kind"][] = ["coverage", "forbidden", "rest", "streak", "restStreak", "weeklyRest", "monthlyRest"];
 const issueKey = (i: Issue) => `${i.kind}|${i.staffId ?? ""}|${i.date}|${i.message}`;
 const SEEDS = 16;
 /** From "keep the rotation pattern" to "change as few cells as possible". */
@@ -123,8 +124,12 @@ function levelOf(hard: Issue[], soft: Warning[]): Level {
   return hard.length ? "red" : soft.some((w) => w.kind !== "coverage") ? "amber" : "green";
 }
 
-function reasonFor(hard: Issue[]): string | undefined {
-  if (!hard.length) return undefined;
+function reasonFor(hard: Issue[], soft: Warning[] = []): string | undefined {
+  if (!hard.length) {
+    // amber: it works, but forcing something the planner normally avoids
+    const forced = soft.filter((w) => w.kind !== "coverage");
+    return forced.length ? `Se puede, pero forzando algo: ${forced.slice(0, 2).map((w) => w.message).join(" · ")}${forced.length > 2 ? ` (+${forced.length - 2} más)` : ""}` : undefined;
+  }
   const first = hard.slice(0, 2).map((i) => i.message).join(" · ");
   return `No se puede cuadrar sin romper reglas: ${first}${hard.length > 2 ? ` (+${hard.length - 2} más)` : ""}`;
 }
@@ -148,6 +153,15 @@ interface Candidate {
   warnings: Warning[];
   hard: Issue[];
   changes: number;
+}
+
+/** Libres over the monthly limit, added up over everyone (how far a month is from that rule). */
+function excessRest(ctx: RepairContext, staff: Staff[], s: Schedule): number {
+  const max = (ctx.rules ?? DEFAULT_RULES).maxMonthlyRest;
+  const dates = monthDates(ctx.year, ctx.month);
+  return staff
+    .filter((p) => p.role !== "mozo" && p.role !== "director")
+    .reduce((n, p) => n + Math.max(0, dates.filter((d) => s[p.id]?.[d] === "D").length - max), 0);
 }
 
 /** Plans the month again with `pinned` fixed, trying a few seeds and keeping the one that disturbs the least. */
@@ -183,6 +197,21 @@ function replan(ctx: RepairContext, staff: Staff[], pinned: Record<string, Recor
       (cand.hard.length === best.hard.length && (soft(cand) < soft(best) || (soft(cand) === soft(best) && cand.changes < best.changes)))
     )
       best = cand;
+  }
+  if (best && best.hard.length) {
+    // the greedy re-plan left something: try exchanging shifts (pinned cells never move)
+    const night = staff.find((s) => s.role === "night_auditor");
+    const keepNight = (id: string, d: string) => Boolean(night && id === night.id && ctx.schedule[night.id]?.[d] === "D");
+    const better = improveSchedule(best.schedule, staff, ctx.year, ctx.month, {
+      rules: ctx.rules,
+      history: ctx.history,
+      frozen: (id, d) => frozenBy({ pinned })(id, d) || keepNight(id, d),
+      maxChecks: 5000,
+    });
+    const hard = newHard({ ...ctx, staff }, better, known);
+    // fewer problems, or the same ones but smaller (e.g. 12 libres instead of 14)
+    const weight = (h: Issue[], s: Schedule) => h.length * 100 + excessRest(ctx, staff, s);
+    if (weight(hard, better) < weight(best.hard, best.schedule)) best = { ...best, schedule: better, hard, changes: diff({ ...ctx, staff }, better).length };
   }
   return best;
 }
@@ -331,7 +360,7 @@ function planDayOffInner(ctx: RepairContext, staffId: string, from: string, kind
     issues: cand.hard,
     warnings: cand.warnings,
     pins: days.map((x) => ({ staffId, date: x })),
-    reason: reasonFor(cand.hard),
+    reason: reasonFor(cand.hard, cand.warnings),
   };
 }
 
@@ -353,7 +382,7 @@ export function planRestructure(ctx: RepairContext, newStaff: Staff[], from: str
     issues: cand.hard,
     warnings: cand.warnings,
     pins: [],
-    reason: reasonFor(cand.hard),
+    reason: reasonFor(cand.hard, cand.warnings),
   };
 }
 
@@ -387,7 +416,7 @@ export function planFix(ctx: RepairContext): Plan {
     issues: cand.hard,
     warnings: cand.warnings,
     pins: [],
-    reason: reasonFor(cand.hard),
+    reason: reasonFor(cand.hard, cand.warnings),
   };
 }
 
@@ -458,7 +487,7 @@ export function planShiftSwap(ctx: RepairContext, a: string, b: string, date: st
       issues: cand.hard,
       warnings: cand.warnings,
       pins: days.flatMap((x) => [{ staffId: a, date: x }, { staffId: b, date: x }]),
-      reason: reasonFor(cand.hard),
+      reason: reasonFor(cand.hard, cand.warnings),
     },
     date,
   );
